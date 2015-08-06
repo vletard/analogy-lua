@@ -1,14 +1,14 @@
-appa = {
+local appa = {
 }
 
 local params = {
   step_sampling =   500,               -- Valeur d'échantillonage pour chaque mélange
   max_iter      =  1000,               -- Nombre maximal d'itérations pour la recherche  
-  min_iter      =    50,               -- Nombre minimal d'itérations pour la recherche (échantillonnage)
+  min_iter      =     5,               -- Nombre minimal d'itérations pour la recherche (échantillonnage)
   min_occur     =   100,               -- Nombre minimal d'occurrences pour arrêter la recherche
   min_coef      =   100,               -- Ratio minimal entre les deux meilleures occurrences : 1 + min_coef / meilleure_occurrence
   timeout       =     1,
-  debug         = false,
+  debug         =  true,
 }
 
 math.randomseed(os.time())
@@ -24,9 +24,16 @@ local write = function(arg)
   end
 end
 
-if not params.debug then
-  write = function() end
+local __write = write
+function appa.set_debug(bool)
+  params.debug = bool
+  if not params.debug then
+    write = function() end
+  else
+    write = __write
+  end
 end
+appa.set_debug(params.debug)
 
 local function stats(item)
   assert(type(item) == "table")
@@ -117,7 +124,7 @@ end
 
 -- A, B et C sont des séquences d'éléments sous forme de tables à indices numériques
 function appa.solve(A, B, C)
-  write(string.format("__TT__ %19s : %19s :: %19s : ?", analog_io.concat(A), analog_io.concat(B), analog_io.concat(C)))
+  write(string.format("__TT__ %19s : %19s :: %19s : ?", segmentation.concat(A), segmentation.concat(B), segmentation.concat(C)))
   local time = os.time()
 
   -- Si A == C alors B == D
@@ -158,9 +165,9 @@ function appa.solve(A, B, C)
 
 --   local memoized_complements = {}
 
- --   local counter = 1
+  local counter = 1
   while (#max < 2 and it < params.min_iter)
-     or (#max >= 1 and solutions[max[1]].second < 100)
+     or (#max == 1 and solutions[max[1]].second < 100)
      or (#max >= 2
 --        and (write(max[1].."/"..max[2].." \n") or true)
         and solutions[max[1]].second/solutions[max[2]].second < 1 + params.min_coef / solutions[max[1]].second -- and (write("PASSED") or write_ref {max1 = solutions[max[1]].second, max2 = solutions[max[2]].second, ratio = 1+params.min_coef / solutions[max[1]].second, m1 = max[1], m2 = max[2]} or true)
@@ -168,7 +175,9 @@ function appa.solve(A, B, C)
         and (os.time() - start_time < params.timeout and it < params.max_iter)
         )
      do
-    --write(utils.tostring({it = it, time = os.time() - start_time, timeout = params.timeout, min_it = params.min_iter}).."\n")
+ write(utils.tostring({it = it, time = os.time() - start_time, timeout = params.timeout, min_it = params.min_iter, ["#max"] = #max, sol1 = #max >= 1 and solutions[max[1]].second}))
+-- write{solutions = solutions}
+ write "\n"
     it = it + 1
 --    write "shuffling\n"
     S = shuffle(B, C)
@@ -184,6 +193,8 @@ function appa.solve(A, B, C)
 --        write("shuffle "..counter.."\n")
 --        counter = counter + 1
       for _, c_n2 in pairs(comp) do
+        write{c_n2 = c_n2, it = it, comp = utils.table.len(comp), S = utils.table.len(S)}
+        write "\n"
         local c, n2 = c_n2.first, c_n2.second
         local c_str = utils.tostring(c)
         modif = true
@@ -294,3 +305,5 @@ end
 --   end
 --   return s[s.crawl(X, Y, Z)]
 -- end
+
+return appa

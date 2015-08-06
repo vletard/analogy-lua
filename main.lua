@@ -1,24 +1,24 @@
 #!/usr/bin/env lua
 
 dofile "/people/letard/local/lib/lua/toolbox.lua"
-dofile "knowledge.lua"
-dofile "appa.lua"
-dofile "io.lua"
-dofile "search.lua"
+knowledge    = dofile "knowledge.lua"
+appa         = dofile "appa.lua"
+search       = dofile "search.lua"
+segmentation = dofile "segmentation.lua"
 
 
 --------------------------------------------------------------------------------
--- Paramètres
+-- Parameters
 
 
-analog_io.chunk_pattern =
+segmentation.chunk_pattern =
 -- "%S+%s*"  -- words including spaces
    "%S+"     -- words
 -- "."       -- characters
 
 local interactive            = false
 local use_squares            =  true
-local use_cubes              = false
+local use_cubes              =  true
 
 if #arg == 1 then
   if arg[1] == "intra"     then
@@ -63,12 +63,36 @@ local value_file =
 
 --------------------------------------------------------------------------------
 
-function info(arg)
+local function info(arg)
   write(arg)
+end
+appa.set_debug(false)
+
+
+local function load_files(keys, values)
+  local key_file   = io.open(keys)
+  local value_file = io.open(values)
+
+  if not key_file then
+    error "Cannot open key file."
+  elseif not value_file then
+    error "Cannot open value file."
+  end
+  
+  local function read(file)
+    return function ()
+      local input = file:read()
+      return input and segmentation.chunk(input)
+    end
+  end
+
+  io.stderr:write("Loading examples and building index...\n")
+  assert(0 == knowledge.load(read(key_file), read(value_file)))
+  io.stderr:write("...done (lexicon size = "..#knowledge.lexicon..")\n")
 end
 
 
-analog_io.load(key_file, value_file)
+load_files(key_file, value_file)
 
 --------------------------------------------------------------------------------
 -- Lecture des requêtes en entrée
@@ -76,26 +100,26 @@ analog_io.load(key_file, value_file)
 if interactive then
   io.stderr:write "requête : "
 end
-local request_txt = io.read()
-while request_txt do
-  request = analog_io.chunk(request_txt)
+for request_txt in io.lines() do
+  request = segmentation.chunk(request_txt)
 
   local square = { time = 0, nb = 0 }
-  local cube   = { time = 0, nb = 0 }
+  local cube   = { time = 0, nb = 0, unknown = {} }
   local time = os.time()
   local solutions = {}
   local existing = knowledge.pairs[utils.tostring(request)]
   if existing then
     local results = {}
     for _, com in pairs(existing.second) do
-      table.insert(results, analog_io.concat(com))
+      table.insert(results, segmentation.concat(com))
     end
     table.insert(solutions, {results = results, singleton = { x = request_txt }})
   else
     local loc_time
     if use_squares then
       loc_time = os.time()
-      for _, s in ipairs(search.build_squares(request, request_txt)) do
+      local squares = search.build_squares(request, request_txt)
+      for _, s in ipairs(square) do
         table.insert(solutions, s)
         square.nb = square.nb + 1
       end
@@ -103,7 +127,9 @@ while request_txt do
     end
     if use_cubes then
       loc_time = os.time()
-      for _, s in ipairs(search.build_cubes(request, request_txt)) do
+      local cubes
+      cubes, cube.unknown = search.build_cubes(request, request_txt)
+      for _, s in ipairs(cubes) do
         table.insert(solutions, s)
         cube.nb = cube.nb + 1
       end
@@ -115,6 +141,17 @@ while request_txt do
   ------------------------------------------------------------------------
   -- Logging
   ------------------------------------------------------------------------
+  if use_cubes then
+  local unknown = ""
+    for _, symbol in ipairs(cube.unknown) do
+      if unknown ~= "" then
+        unknown = unknown..", "
+      end
+      unknown = unknown..symbol
+      print(string.format("unknown symbols  - %s", symbol))
+    end
+--    print(string.format("unknown symbols  - %s", unknown))
+  end
   if #solutions > 0 then
     if solutions[1].singleton then
       assert(#solutions == 1)
@@ -257,7 +294,6 @@ while request_txt do
     end
     io.stderr:write "requête : "
   end
-  request_txt = io.read()
 end
 if interactive then
   io.stderr:write ""

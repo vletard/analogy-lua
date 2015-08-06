@@ -1,13 +1,13 @@
 #!/usr/bin/env lua
 
 dofile "/people/letard/local/lib/lua/toolbox.lua"
-dofile "appa.lua"
-dofile "io.lua"
+appa         = dofile "appa.lua"
+segmentation = dofile "segmentation.lua"
 
 --------------------------------------------------------------------------------
 -- Paramètres 
 
-analog_io.chunk_pattern =
+segmentation.chunk_pattern =
 -- "%S+%s*"  -- words including spaces
    "%S+"     -- words
 -- "."       -- characters
@@ -26,7 +26,7 @@ assert(arg[1])
 local triple = {}
 local txt_triple = {}
 for match in arg[1]:gmatch("[^\t]+") do
-  table.insert(triple, analog_io.chunk(match))
+  table.insert(triple, segmentation.chunk(match))
   table.insert(txt_triple, match)
 end
 assert(#triple == 3)

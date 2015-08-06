@@ -1,11 +1,15 @@
-search = {}
+local search = {}
 
 --------------------------------------------------------------------------------
 -- Recherche de cubes analogiques
 
 function search.build_cubes(request, request_txt)
   local solutions = {}
-  local triples = {}
+  local triples   = {}
+  local unknown   = knowledge.list_unknown(request)
+  if #unknown > 0 then
+    return {}, unknown
+  end
   for _, pair in pairs(knowledge.pairs) do
     for _, res_pair in ipairs(knowledge.retrieve(request, pair.first)) do
       local x = {
@@ -49,11 +53,11 @@ function search.build_cubes(request, request_txt)
           local res = appa.solve(com_x, com_y, com_z)
           if #res > 0 then
             local t = res[#res]
-            t.solution = analog_io.concat(t.solution)
+            t.solution = segmentation.concat(t.solution)
             table.insert(results, {
-              x = analog_io.concat(com_x),
-              y = analog_io.concat(com_y),
-              z = analog_io.concat(com_z),
+              x = segmentation.concat(com_x),
+              y = segmentation.concat(com_y),
+              z = segmentation.concat(com_z),
               t = t
             })
           end
@@ -61,15 +65,15 @@ function search.build_cubes(request, request_txt)
       end
     end
     table.insert(solutions, {results = results, triple = {
-      x = analog_io.concat(x.request),
-      y = analog_io.concat(y.request),
-      z = analog_io.concat(z.request),
+      x = segmentation.concat(x.request),
+      y = segmentation.concat(y.request),
+      z = segmentation.concat(z.request),
       X = x,
       Y = y,
       Z = z
     }})
   end
-  return solutions
+  return solutions, {}
 end
 --------------------------------------------------------------------------------
 
@@ -110,10 +114,10 @@ function search.build_squares(request, request_txt)
         local res = appa.solve(pair.first, command, request)
         if #res > 0 then
           local t = res[#res]
-          t.solution = analog_io.concat(t.solution)
+          t.solution = segmentation.concat(t.solution)
           table.insert(solutions, { results = { { t = t } }, triple = {
-            x = analog_io.concat(pair.first),
-            y = analog_io.concat(command),
+            x = segmentation.concat(pair.first),
+            y = segmentation.concat(command),
             z = request_txt,
             }, square = true})
         end
@@ -124,4 +128,4 @@ function search.build_squares(request, request_txt)
 end
 --------------------------------------------------------------------------------
 
-
+return search

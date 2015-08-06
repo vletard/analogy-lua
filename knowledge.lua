@@ -1,6 +1,6 @@
 dofile "/people/letard/local/lib/lua/toolbox.lua"
 
-knowledge = {
+local knowledge = {
   lexicon    =  {},
   pairs      =  {},
   histogram  =  {},
@@ -10,11 +10,11 @@ knowledge = {
 
 
 --------------------------------------------------------------------------------
--- Implémentation de l'arbre de comptage (Langlais & Yvon, 2008)
+-- Implementation of tree-count (Langlais & Yvon, 2008)
 
 local tc = {}
 
--- Extraction d'un vecteur de comptage à partir d'une ou plusieurs formes
+-- Extracting a count vector from one or more forms
 function tc.encode(...)
   local counts = {}
   for _, form in ipairs(table.pack(...)) do
@@ -25,12 +25,12 @@ function tc.encode(...)
   return counts
 end
 
--- Création d'un noeud
+-- Node creation
 function tc.node(index, forms, children)
   return { index = index, forms = forms or {}, children = children or {} }
 end
 
--- Insertion d'un noeud dans l'arbre
+-- Node insertion in the tree
 function tc.insert(counts, ic, current, parent, alphabet)
   local count = counts[alphabet[ic]] or 0
   assert(current ~= nil)
@@ -72,7 +72,7 @@ function tc.insert(counts, ic, current, parent, alphabet)
   return current, parent
 end
 
--- Recherche et positionnement d'un vecteur de comptage dans l'arbre
+-- Searching and setting a count vector within the tree
 function tc.search(counts, tree, alphabet)
   local i = 0
   local parent = nil
@@ -101,7 +101,7 @@ function tc.search(counts, tree, alphabet)
   return current, parent, i
 end
 
--- Construction
+-- Building the tree
 function tc.build(alphabet, forms)
   local tree = tc.node(0, nil, { [0] = tc.node() })
   local A = #alphabet
@@ -124,7 +124,8 @@ function tc.retrieve(tree, counts)
   local i = 0
   for w, _ in pairs(counts) do
     if not knowledge.histogram[w] then
-      return {} -- Il y a un symbole de counts qui n'existe pas dans le lexique
+      return {} -- At least on symbol is not present in the lexicon
+                -- Note that if the check is performed sooner (more optimal) this case should never occur
     end
   end
   while i <= A and utils.table.len(frontier) ~= 0 do
@@ -175,13 +176,23 @@ end
 
 --------------------------------------------------------------------------------
 
+function knowledge.list_unknown(request)
+  local unknown_symbols = {}
+  for _, symbol in ipairs(request) do
+    if (knowledge.histogram[symbol] or 0) == 0 then
+      table.insert(unknown_symbols, symbol)
+    end
+  end
+  return unknown_symbols
+end
+
 function knowledge.retrieve(request, match)
   return tc.retrieve(knowledge.tree_count, tc.encode(request, match))
 end
 
--- Charge les paires d'éléments dans la base d'exemples.
--- Les paramètres keys et values doivent être des itérateurs !
--- Retourne 1 si plus de clés que de valeurs, -1 si plus de valeurs que de clés, 0 sinon.
+-- Loads the pairs in input
+-- The keys and values parameters must be iterators
+-- Returns 1 if there are more keys than values, -1 if the converse is true, 0 if the numbers match
 function knowledge.load(keys, values)
   local k, v = keys(), values()
   local histo = {}
@@ -230,3 +241,5 @@ function knowledge.load(keys, values)
     return 0
   end
 end
+
+return knowledge
