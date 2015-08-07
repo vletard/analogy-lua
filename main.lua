@@ -10,11 +10,7 @@ segmentation = dofile "segmentation.lua"
 --------------------------------------------------------------------------------
 -- Parameters
 
-
-segmentation.chunk_pattern =
--- "%S+%s*"  -- words including spaces
-   "%S+"     -- words
--- "."       -- characters
+segmentation.set_mode("words")
 
 local interactive            = false
 local use_squares            =  true
@@ -148,7 +144,7 @@ for request_txt in io.lines() do
         unknown = unknown..", "
       end
       unknown = unknown..symbol
-      print(string.format("unknown symbols  - %s", symbol))
+      print(string.format("unknown symbol   - %s", symbol))
     end
 --    print(string.format("unknown symbols  - %s", unknown))
   end
@@ -190,7 +186,11 @@ for request_txt in io.lines() do
       end
     end
   else
-    print(string.format("result not found \"%s\"", request_txt))
+    if use_cubes then
+      print(string.format("result not found (%d US) \"%s\"", #cube.unknown, request_txt))
+    else
+      print(string.format("result not found \"%s\"", request_txt))
+    end
   end
   print(string.format("detail totaltime %3d", os.time() - time))
   print(string.format("final %s", #list > 0 and list[math.random(#list)] or ""))  -- TODO better choice !!!!
