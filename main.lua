@@ -17,58 +17,63 @@ local interactive            = false
 -- End parameters
 --------------------------------------------------------------------------------
 
-if #arg >= 1 then
-  if arg[1] == "intra"     then
-    use_squares = false
-    use_cubes   =  true
-  elseif arg[1] == "inter" then
-    use_squares =  true
-    use_cubes   = false
-  elseif arg[1] == "both"  then
-    use_squares =  true
-    use_cubes   =  true
-  elseif arg[1] == "singletons" then
-    use_squares = false
-    use_cubes   = false
-  else
-    io.stderr:write("First argument is incorrect ('"..arg[1].."')\n")
-    os.exit()
-  end
-  if #arg >= 2 then
-    if arg[2] == "dynamic" then
-      segmentation.dynamic = true
-    else
-      io.stderr:write("Second argument is incorrect ('"..arg[1].."'): must be 'dynamic' or nothing.\n")
-      os.exit()
-    end
-  end
-else
-  io.stderr:write "Analogical mode parameter is missing (intra|inter|both|singletons)\n"
+local key_file, value_file
+
+
+if #arg < 3 then
+  io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE ANALOGICAL_MODE [dynamic]")
+  io.stderr:write("\nANALOGICAL_MODE is one of intra, inter, both, singletons")
   os.exit()
 end
+key_file   = arg[1]
+value_file = arg[2]
+if arg[3] == "intra"     then
+  use_squares = false
+  use_cubes   =  true
+elseif arg[3] == "inter" then
+  use_squares =  true
+  use_cubes   = false
+elseif arg[3] == "both"  then
+  use_squares =  true
+  use_cubes   =  true
+elseif arg[3] == "singletons" then
+  use_squares = false
+  use_cubes   = false
+else
+  io.stderr:write("Third argument is incorrect ('"..arg[1].."')\n")
+  os.exit()
+end
+if #arg >= 4 then
+  if arg[4] == "dynamic" then
+    segmentation.dynamic = true
+  else
+    io.stderr:write("Fourth argument is incorrect ('"..arg[1].."'): must be 'dynamic' or nothing.\n")
+    os.exit()
+  end
+end
 
-local   key_file = 
- "../case_base/2015_05_bash/train/01_l.in.txt" -- case_base 01
--- "../case_base/2015_05_bash/train/01.in.txt"
-
--- "../case_base/2015_05_bash/train/01.in.g01_l.txt" -- case_base 01 (generation_01)
--- "../case_base/2015_05_bash/train/01.in.g01_tmp_l.txt"
--- "../case_base/2015_05_bash/train/01.in.g01_tmp.txt"
-
--- "../case_base/2014_01_R/train/01.in.txt"
-
--- "../case_base/perso/in.txt"
-
-local value_file = 
- "../case_base/2015_05_bash/train/01.out.txt" -- case_base 01
-
--- "../case_base/2015_05_bash/train/01.out.g01.txt" -- case_base 01 (generation_01)
--- "../case_base/2015_05_bash/train/01.out.g01_tmp_fixed.txt"
--- "../case_base/2015_05_bash/train/01.out.g01_tmp.txt"
-
--- "../case_base/2014_01_R/train/01.out.txt"
-
--- "../case_base/perso/out.txt"
+-- local   key_file = 
+--  "../case_base/2015_05_bash/train/01_l.in.txt" -- case_base 01
+-- -- "../case_base/2015_05_bash/train/01.in.txt"
+-- 
+-- -- "../case_base/2015_05_bash/train/01.in.g01_l.txt" -- case_base 01 (generation_01)
+-- -- "../case_base/2015_05_bash/train/01.in.g01_tmp_l.txt"
+-- -- "../case_base/2015_05_bash/train/01.in.g01_tmp.txt"
+-- 
+-- -- "../case_base/2014_01_R/train/01.in.txt"
+-- 
+-- -- "../case_base/perso/in.txt"
+-- 
+-- local value_file = 
+--  "../case_base/2015_05_bash/train/01.out.txt" -- case_base 01
+-- 
+-- -- "../case_base/2015_05_bash/train/01.out.g01.txt" -- case_base 01 (generation_01)
+-- -- "../case_base/2015_05_bash/train/01.out.g01_tmp_fixed.txt"
+-- -- "../case_base/2015_05_bash/train/01.out.g01_tmp.txt"
+-- 
+-- -- "../case_base/2014_01_R/train/01.out.txt"
+-- 
+-- -- "../case_base/perso/out.txt"
 
 --------------------------------------------------------------------------------
 -- Log and debug
@@ -77,7 +82,9 @@ local function info(arg)
   write(arg)
 end
 appa  .set_debug(false)
-search.set_debug( true)
+search.set_debug(false)
+
+search.set_log  ( true)
 
 --------------------------------------------------------------------------------
 

@@ -6,6 +6,7 @@ local params = {
   cube_seg_max_triplets1 = math.huge,
   cube_seg_max_triplets2 = math.huge,
   debug = false,
+  log   = false,
 }
 
 local stack = ""
@@ -29,6 +30,17 @@ function search.set_debug(bool)
   end
 end
 search.set_debug(params.debug)
+
+function search.set_log(bool)
+  params.log = bool
+  if not params.log then
+    log = function() end
+  else
+    log = utils.write
+  end
+end
+search.set_debug(params.debug)
+
 
 -- Returns the list of enumeration functions for each valid triplet found in the knowledge base for the given request.
 local function enumerate_valid_triplets(request)
@@ -77,7 +89,7 @@ local function enumerate_valid_triplets(request)
       end
     end
   end
-  write("[cube] triplets retrieved : "..counter.."\n")
+  log("[cube] triplets retrieved : "..counter.."\n")
   if generators_end then
     generators_end.next = generators_start
   end

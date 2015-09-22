@@ -1,10 +1,24 @@
 #!/bin/bash
 
-if (( $# < 1 ))
+if (( $# < 3 ))
 then
-  echo "Test file(s) missing (requests)" >&2
+  echo "Usage: $0 KEY_FILE VALUE_FILE TEST_FILE [ADDITIONAL_TEST_FILES]" >&2
   exit
 fi
+
+keys=$1
+shift
+values=$1
+shift
+
+CB_number=$(cat $keys $values | md5sum)
+CB_number=${CB_number:0:7}
+
+PROG_number=$(git log | grep commit | head -n 1 | cut -f2 -d' ')
+PROG_number=${PROG_number:0:7}
+
+echo "  CB_number: $CB_number"
+echo "PROG_number: $PROG_number"
 
 while [[ "$1" != "" ]]
 do
@@ -15,13 +29,11 @@ do
   
   overwrite=false
   
-  read -p "Name of the case base version: " name
-  
   for strategy in intra inter both singletons
   do
     for dynamic in true false
     do
-      output_file="$root/results_cb${name}_${file}_$strategy"
+      output_file="$root/log_PROG${PROG_number}_CB${CB_number}_${file}_$strategy"
       if $dynamic
       then
         output_file=${output_file}_dynamic
@@ -38,15 +50,19 @@ do
           "y"|"Y") echo "overwriting" ;;
           "n"|"N") echo "skipping file"; continue ;;
           "a"|"A") echo "overwriting all files"; overwrite=true ;;
-          *) echo "aborting"; break ;;
+          *) echo "aborting"; exit ;;
         esac
       fi
       if $dynamic
       then
-        time ./main.lua $strategy dynamic < $1 > $output_file
+        echo "Running: ./main.lua $keys $values $strategy dynamic < $1 > $output_file"
+        time ./main.lua $keys $values $strategy dynamic < $1 > $output_file
       else
-        time ./main.lua $strategy < $1 > $output_file
+        echo "Running: ./main.lua $keys $values $strategy < $1 > $output_file"
+        time ./main.lua $keys $values $strategy < $1 > $output_file
       fi
+      grep totaltime $output_file > ${output_file}_time
+      grep final $output_file | cut -b 7- > ${output_file}_results
     done
   done
 
