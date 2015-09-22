@@ -8,7 +8,7 @@ local params = {
   min_occur     =   100,               -- Nombre minimal d'occurrences pour arrêter la recherche
   min_coef      =   100,               -- Ratio minimal entre les deux meilleures occurrences : 1 + min_coef / meilleure_occurrence
   timeout       =     1,
-  debug         =  true,
+  debug         = false,
 }
 
 math.randomseed(os.time())
@@ -122,9 +122,36 @@ local function complement(s, x, prefix, i, j, result)
   return result
 end
 
+-- Checks whether the counts of the terminal symbols of the sequences in parameter are invalid for analogy or not.
+-- Note that the sequence D is optional, if absent, the triplet is checked for counts inequality.
+-- 
+-- The actual half-count per segment is returned in second place.
+function appa.count(A, B, C, D)
+  local segments = {}
+  local total = {}
+  for _, item in ipairs {B, C} do
+    for _, w in ipairs(item[1]) do
+      segments[w] = (segments[w] or 0) + 1
+      total[w] = (total[w] or 0) + 1
+    end
+  end
+  for _, item in ipairs {A, D or {{}} } do
+    for _, w in ipairs(item[1]) do
+      local val = (total[w] or 0) - 1
+      if val < 0 then
+        write(" INEQUAL = '"..w.."'\n")
+        return false
+      else
+        total[w] = val
+      end
+    end
+  end
+  return true, segments
+end
+
 -- A, B et C sont des séquences d'éléments sous forme de tables à indices numériques
 function appa.solve(A, B, C)
-  write(string.format("__TT__ %19s : %19s :: %19s : ?", segmentation.concat(A), segmentation.concat(B), segmentation.concat(C)))
+  write(string.format("__TT__ %19s : %19s :: %19s : ?", segmentation.concat(A, "| "), segmentation.concat(B, "| "), segmentation.concat(C, "| ")))
   local time = os.time()
 
   -- Si A == C alors B == D
@@ -132,33 +159,44 @@ function appa.solve(A, B, C)
     return { { solution = B, occurrences = 1 } }
   elseif utils.deepcompare(A, B) then
     return { { solution = C, occurrences = 1 } }
-  elseif utils.deepcompare(B, C) then
-    return { { solution = A, occurrences = 1 } }
+--  elseif utils.deepcompare(B, C) then
+--    return { { solution = A, occurrences = 1 } }
   end
 
-  -- Vérification de l'inégalité sur les éléments du lexique avant de poursuivre
-  do
-    local total = {}
-    for _, w in ipairs(B) do
-      total[w] = (total[w] or 0) + 1
-    end
-    for _, w in ipairs(C) do
-      total[w] = (total[w] or 0) + 1
-    end
-    for _, w in ipairs(A) do
-      local val = (total[w] or 0) - 1
-      if val < 0 then
-        write(" INEQUAL = '"..w.."'\n")
-        return {}
-      else
-        total[w] = val
+  -- Checking symbol counts
+  local test, segments = appa.count(A, B, C)
+  if test then
+    write " PASSED"
+  else
+    return {}
+  end
+
+  for _, item in ipairs {B, C} do
+    for _, seg in ipairs(item) do
+      for _, s in ipairs(seg) do
+        segments[s] = (segments[s] or 0) + 1
       end
     end
-    write " PASSED"
   end
 
-  local solutions = {} -- indexe les solutions et leurs occurrences
-  local max = {}       -- contient les n éléments ayant le plus d'occurrences (représentation en chaîne de caractères)
+  local first_seg, result_list = segmentation.enumerate_segmentations_list(A, {B, C})()
+  if first_seg == nil then
+    return {}
+  end
+  
+--  write "\n"
+--  write(first_seg)
+--  write(result_list)
+--  write "\n"
+
+--  if true then return {} end
+
+  A = first_seg
+  B = result_list[1]
+  C = result_list[2]
+
+  local solutions = {} -- index of the solutions and there occurrences
+  local max = {}       -- holds the n solutions having the biggest numbers of occurrences (string representations)
   local modif = true
   local it = 0
   local start_time = os.time()
@@ -175,17 +213,17 @@ function appa.solve(A, B, C)
         and (os.time() - start_time < params.timeout and it < params.max_iter)
         )
      do
- write(utils.tostring({it = it, time = os.time() - start_time, timeout = params.timeout, min_it = params.min_iter, ["#max"] = #max, sol1 = #max >= 1 and solutions[max[1]].second}))
--- write{solutions = solutions}
- write "\n"
+--  write(utils.tostring({it = it, time = os.time() - start_time, timeout = params.timeout, min_it = params.min_iter, ["#max"] = #max, sol1 = #max >= 1 and solutions[max[1]].second}))
+-- -- write{solutions = solutions}
+--  write "\n"
     it = it + 1
 --    write "shuffling\n"
-    S = shuffle(B, C)
+    S = shuffle(B[1], C[1])
  --   write("shuffle('"..concat(B).."', '"..concat(C).."') ("..#B..", "..#C..") -> "..utils.table.len(S).."\n")
     modif = false
     for _, sw in pairs(S) do
       local s, w = sw.first, sw.second
-      local comp = complement(s, A) -- memoized_complements[utils.tostring{s, A}]
+      local comp = complement(s, A[1]) -- memoized_complements[utils.tostring{s, A}]
 --       if not comp then
 --         comp = complement(s, A)
 --         memoized_complements[utils.tostring{s, A}] = comp
@@ -193,12 +231,21 @@ function appa.solve(A, B, C)
 --        write("shuffle "..counter.."\n")
 --        counter = counter + 1
       for _, c_n2 in pairs(comp) do
-        write{c_n2 = c_n2, it = it, comp = utils.table.len(comp), S = utils.table.len(S)}
-        write "\n"
-        local c, n2 = c_n2.first, c_n2.second
+--        write{c_n2 = c_n2, it = it, comp = utils.table.len(comp), S = utils.table.len(S)}
+--        write "\n"
+        local c, n2 = { c_n2.first }, c_n2.second
+        
+        -- The segmentation mode is inherited by analogy too
+        if A.mode == C.mode then
+          c.mode = B.mode
+        else
+          assert(A.mode == B.mode)
+          c.mode = C.mode
+        end
+
         local c_str = utils.tostring(c)
         modif = true
-        local pack = solutions[c_str] or {first = c, second = 0}
+        local pack  = solutions[c_str] or {first = { x = A, y = B, z = C, t = c }, second = 0 }
         pack.second = pack.second + w
         solutions[c_str] = pack
         local val = pack.second
@@ -250,13 +297,13 @@ function appa.check(x, y, z, t)
     for j=0,Y do
       for k=0,Z do
         for l=0,T do
-          if i == j and j == k and k == l then
+          if i == 0 and i == j and j == k and k == l then
             a[a.crawl(i, j, k, l)] = true
           else
             a[a.crawl(i, j, k, l)] = ((a[a.crawl(i-1, j-1, k  , l  )] and x[i] == y[j])
-                                  or (a[a.crawl(i-1, j  , k-1, l  )] and x[i] == z[k])
-                                  or (a[a.crawl(i  , j-1, k  , l-1)] and t[l] == y[j]) 
-                                  or (a[a.crawl(i  , j  , k-1, l-1)] and t[l] == z[k])) or nil
+                                   or (a[a.crawl(i-1, j  , k-1, l  )] and x[i] == z[k])
+                                   or (a[a.crawl(i  , j-1, k  , l-1)] and t[l] == y[j]) 
+                                   or (a[a.crawl(i  , j  , k-1, l-1)] and t[l] == z[k])) or nil
           end
         end
       end
@@ -264,46 +311,5 @@ function appa.check(x, y, z, t)
   end
   return a[a.crawl(X, Y, Z, T)] or false
 end
-
--- INCORRECT
--- function appa.tabular_solve(x, y, z)
---   local X, Y, Z = #x, #y, #z
---   local s = {}
---   s.crawl = function (a, b, c)
---     return (((a * Y) + b) * Z) + c
---   end
---   for i=-1,0 do
---     for j=-1,0 do
---       for k=-1,0 do
---         s[s.crawl(i, j, k)] = {}
---       end
---     end
---   end
---   for i=0,X do
---     for j=0,Y do
---       for k=0,Z do
---         if not (i == j and j == k and k == 0) then
---           if x[i] == y[j] then
---             for _, pref in ipairs(s[s.crawl(i-1, j-1, k)]) do
---               table.insert(s[s.crawl(i, j, k)], pref)
---             end
---           end
---           if x[i] == z[k] then
---             for _, pref in ipairs(s[s.crawl(i-1, j, k-1)]) do
---               table.insert(s[s.crawl(i, j, k)], pref)
---             end
---           end
---           for _, pref in ipairs(s[s.crawl(i, j-1, k)]) do
---             table.insert(s[s.crawl(i, j, k)], pref..y[j])
---           end
---           for _, pref in ipairs(s[s.crawl(i, j, k-1)]) do
---             table.insert(s[s.crawl(i, j, k)], pref..z[k])
---           end
---         end
---       end
---     end
---   end
---   return s[s.crawl(X, Y, Z)]
--- end
 
 return appa

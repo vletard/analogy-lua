@@ -10,13 +10,14 @@ segmentation = dofile "segmentation.lua"
 --------------------------------------------------------------------------------
 -- Parameters
 
-segmentation.set_mode("words")
-
+segmentation.set_mode("words_dynamic")
 local interactive            = false
-local use_squares            =  true
-local use_cubes              =  true
 
-if #arg == 1 then
+
+-- End parameters
+--------------------------------------------------------------------------------
+
+if #arg >= 1 then
   if arg[1] == "intra"     then
     use_squares = false
     use_cubes   =  true
@@ -30,8 +31,20 @@ if #arg == 1 then
     use_squares = false
     use_cubes   = false
   else
-    error("Argument 1 incorrect ('"..arg[1].."')")
+    io.stderr:write("First argument is incorrect ('"..arg[1].."')\n")
+    os.exit()
   end
+  if #arg >= 2 then
+    if arg[2] == "dynamic" then
+      segmentation.dynamic = true
+    else
+      io.stderr:write("Second argument is incorrect ('"..arg[1].."'): must be 'dynamic' or nothing.\n")
+      os.exit()
+    end
+  end
+else
+  io.stderr:write "Analogical mode parameter is missing (intra|inter|both|singletons)\n"
+  os.exit()
 end
 
 local   key_file = 
@@ -58,12 +71,15 @@ local value_file =
 -- "../case_base/perso/out.txt"
 
 --------------------------------------------------------------------------------
+-- Log and debug
 
 local function info(arg)
   write(arg)
 end
-appa.set_debug(false)
+appa  .set_debug(false)
+search.set_debug( true)
 
+--------------------------------------------------------------------------------
 
 local function load_files(keys, values)
   local key_file   = io.open(keys)
@@ -75,15 +91,15 @@ local function load_files(keys, values)
     error "Cannot open value file."
   end
   
-  local function read(file)
+  local function read(file, NLFL)
     return function ()
       local input = file:read()
-      return input and segmentation.chunk(input)
+      return input and segmentation["chunk_"..NLFL](input)
     end
   end
 
   io.stderr:write("Loading examples and building index...\n")
-  assert(0 == knowledge.load(read(key_file), read(value_file)))
+  assert(0 == knowledge.load(read(key_file, "NL"), read(value_file, "FL")))
   io.stderr:write("...done (lexicon size = "..#knowledge.lexicon..")\n")
 end
 
@@ -91,19 +107,21 @@ end
 load_files(key_file, value_file)
 
 --------------------------------------------------------------------------------
--- Lecture des requêtes en entrée
+-- Reading requests from stdin (1 request = 1 line)
+local num_input = 0
 
 if interactive then
   io.stderr:write "requête : "
 end
 for request_txt in io.lines() do
-  request = segmentation.chunk(request_txt)
+  num_input = num_input + 1
+  request = segmentation.chunk_NL(request_txt)
 
   local square = { time = 0, nb = 0 }
   local cube   = { time = 0, nb = 0, unknown = {} }
   local time = os.time()
   local solutions = {}
-  local existing = knowledge.pairs[utils.tostring(request)]
+  local existing = knowledge.pairs[utils.tostring(request[1])]
   if existing then
     local results = {}
     for _, com in pairs(existing.second) do
@@ -115,7 +133,7 @@ for request_txt in io.lines() do
     if use_squares then
       loc_time = os.time()
       local squares = search.build_squares(request, request_txt)
-      for _, s in ipairs(square) do
+      for _, s in ipairs(squares) do
         table.insert(solutions, s)
         square.nb = square.nb + 1
       end
@@ -148,6 +166,9 @@ for request_txt in io.lines() do
     end
 --    print(string.format("unknown symbols  - %s", unknown))
   end
+  if not interactive then
+    print("input #"..num_input.." -> \""..request_txt.."\"")
+  end
   if #solutions > 0 then
     if solutions[1].singleton then
       assert(#solutions == 1)
@@ -159,22 +180,26 @@ for request_txt in io.lines() do
         for _, r in ipairs(s.results) do
           nb = nb + 1
           if s.square then
-            table.insert(list, r.t.solution)
-            print(string.format("result square%3d \"%s\" -> %s", #list, request_txt, r.t.solution))
+            table.insert(list, r.final)
+            print(string.format("result square%3d -> %s", #list, r.final))
+            print(string.format("detail triple    x = \"%s\"   y = \"%s\"   z = \"%s\"", r.x, r.y, r.z))
             print(string.format("detail more      time = %3d   results = %3d          ", square.time, square.nb))
           else
             table.insert(list, r.t.solution)
-            print(string.format("result cube  %3d \"%s\" -> %s", #list, request_txt, r.t.solution))
+            print(string.format("result cube  %3d -> %s", #list, r.t.solution))
             print(string.format("detail triple O  x = \"%s\"   y = \"%s\"   z = \"%s\"", r.x, r.y, r.z))
             print(string.format("detail more      time = %3d   results = %3d          ", cube.time, cube.nb))
           end
         end
-        if nb == 0 and not s.square then
-          print(string.format("result noanalogy \"%s\"", request_txt))
-          print(string.format("detail triple O  x = \"%s\"   y = \"%s\"   z = \"%s\"",
-            concat(s.triple.X.commands[next(s.triple.X.commands)]), 
-            concat(s.triple.Y.commands[next(s.triple.Y.commands)]), 
-            concat(s.triple.Z.commands[next(s.triple.Z.commands)]) 
+        if not s.square then
+--          print(string.format("result cube1     \"%s\"", request_txt))
+          print(string.format("detail triple I  x = \"%s\"   y = \"%s\"   z = \"%s\"",
+            s.triple.x,
+            s.triple.y,
+            s.triple.z
+--            segmentation.concat(s.triple.X.commands[next(s.triple.X.commands)]), 
+--            segmentation.concat(s.triple.Y.commands[next(s.triple.Y.commands)]), 
+--            segmentation.concat(s.triple.Z.commands[next(s.triple.Z.commands)]) 
           ))
           print(string.format("detail commands  x = %2d   y = %2d   z = %2d",
             utils.table.len(s.triple.X.commands),
@@ -182,7 +207,7 @@ for request_txt in io.lines() do
             utils.table.len(s.triple.Z.commands)
           ))
         end
-        print(string.format("detail triple I  x = \"%s\"   y = \"%s\"   z = \"%s\"", s.triple.x, s.triple.y, s.triple.z))
+--        print(string.format("detail triple I  x = \"%s\"   y = \"%s\"   z = \"%s\"", s.triple.x, s.triple.y, s.triple.z))
       end
     end
   else
@@ -195,94 +220,6 @@ for request_txt in io.lines() do
   print(string.format("detail totaltime %3d", os.time() - time))
   print(string.format("final %s", #list > 0 and list[math.random(#list)] or ""))  -- TODO better choice !!!!
   print ""
-
---   info(os.time())
---   local search_space = {} -- utils.table.set_deep_index {}
---   local max_len = 0
---   for _, w in ipairs(request) do
---     for _, k in ipairs(knowledge.vocabulary[w] or {}) do
---       local sub_ss = search_space[#w] or --[[ utils.table.set_deep_index ]] {}
---       sub_ss[k] = true
---       search_space[#w] = sub_ss
---       if #w > max_len then
---         max_len = #w
---       end
---     end
---   end
---   info(os.time())
--- 
---   info("Répartition : ")
---   local tmp = search_space
---   search_space = {}
---   for i=1,max_len do
---     local n = max_len + 1 - i
---     local list = tmp[n]
---     if list then
---       info(n.." -> "..utils.table.len(list))
---       for k, _ in pairs(list) do
---         table.insert(search_space, k)
---       end
---     end
---   end
---   info("Proportion de la base utilisée : "..utils.table.len(search_space).."/"..utils.table.len(knowledge.pairs))
---   info(os.time())
--- 
---   local analogy1 = utils.table.set_deep_index({})
---   for sum=1,2*#search_space do
---     for term=1,sum-1 do
---       local k1 = search_space[term]
---       local k2 = search_space[sum-term]
---       if not utils.deepcompare(k1, k2) then
---         local solutions = appa.solve(request, k1,    k2   )
---         if #solutions > 0 then
---           analogy1[{request, k1,    k2   , solutions[#solutions].solution}] = 1
---         end
---         local solutions = appa.solve(k1,    request, k2   )
---         if #solutions > 0 then
---           analogy1[{k1,    request, k2   , solutions[#solutions].solution}] = 2
---         end
---         local solutions = appa.solve(k1,    k2,    request)
---         if #solutions > 0 then
---           analogy1[{k1,    k2,    request, solutions[#solutions].solution}] = 3
---         end
---       end
---     end
---   end
--- 
---   if table.len(analogy1) == 0 then
---     io.stderr:write("Aucun triplet analogique trouvé.".."\n")
---     os.exit()
---   end
---   
---   io.stderr:write(utils.tostring{analogy1 = analogy1}.."\n")
---   
---   analogy2 = {}
---   tested = {}
---   for k, v in pairs(analogy1) do
---     local example = knowledge.pairs[k[4]]
---     if example then
---       local v1, v2, v3, v4 = knowledge.get(k[1]), knowledge.get(k[2]), knowledge.get(k[3]), knowledge.get(k[4])
---       local solutions
---       if v == 1 then
---         solutions = appa.solve(v4, v2, v3)
---       elseif v == 2 then
---         solutions = appa.solve(v3, v1, v4)
---       elseif v == 3 then
---         solutions = appa.solve(v2, v1, v4)
---       end
---       if #solutions > 0 then
---         local s = {v1, v2, v3, v4}
---         s[v] = solutions[#solutions].solution
---   --      table.insert(analogy3, {k, s})
---         table.insert(analogy2, s[v])
---       else
---         io.stderr:write("Pas de solution pour :\n "..v1.." : "..v2.." :: "..v3.." : ?".."\n")
---       end
---     elseif not tested[k[4]] then
---       io.stderr:write("Pas d'image pour \""..k[4].."\"".."\n")
---       tested[k[v]] = true
---     end
---   end
 
   if interactive then
     if #list > 0 then

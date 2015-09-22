@@ -1,4 +1,4 @@
-dofile "/people/letard/local/lib/lua/toolbox.lua"
+utils = dofile "/people/letard/local/lib/lua/toolbox.lua"
 
 local knowledge = {
   lexicon    =  {},
@@ -106,14 +106,14 @@ function tc.build(alphabet, forms)
   local tree = tc.node(0, nil, { [0] = tc.node() })
   local A = #alphabet
   for _, pair in pairs(forms) do
-    local f = pair.first
+    local f = pair.first[1]
     local counts = tc.encode(f)
     local current, parent, i = tc.search(counts, tree, alphabet)
     while i <= A do
       current, parent = tc.insert(counts, i, current, parent, alphabet)
       i = i + 1
     end
-    table.insert(current.forms, f)
+    table.insert(current.forms, pair.first)
   end
   return tree
 end
@@ -165,7 +165,7 @@ function tc.retrieve(tree, counts)
   for p1, p2 in pairs(frontier) do
     for _, f1 in ipairs(p1.forms) do
       for _, f2 in ipairs(p2.forms) do
-        assert(utils.deepcompare(tc.encode(f1, f2), counts))
+        assert(utils.deepcompare(tc.encode(f1[1], f2[1]), counts))
         table.insert(forms, {first = f1, second = f2})
       end
     end
@@ -178,7 +178,7 @@ end
 
 function knowledge.list_unknown(request)
   local unknown_symbols = {}
-  for _, symbol in ipairs(request) do
+  for _, symbol in ipairs(request[1]) do
     if (knowledge.histogram[symbol] or 0) == 0 then
       table.insert(unknown_symbols, symbol)
     end
@@ -187,7 +187,7 @@ function knowledge.list_unknown(request)
 end
 
 function knowledge.retrieve(request, match)
-  return tc.retrieve(knowledge.tree_count, tc.encode(request, match))
+  return tc.retrieve(knowledge.tree_count, tc.encode(request[1], match[1]))
 end
 
 -- Loads the pairs in input
@@ -200,36 +200,41 @@ function knowledge.load(keys, values)
     if not v then
       return 1
     end
-    assert(not (#v == 0 and #k ~=0) and not (#v ~= 0 and #k == 0))
-    if #k ~= 0 and #v ~= 0 then
-      local r_content = knowledge.commands[utils.tostring(v)] or {first = v, second = {}}
-      r_content.second[utils.tostring(k)] = k
-      knowledge.commands[utils.tostring(v)] = r_content
+    assert(not (#v[1] == 0 and #k[1] ~=0) and not (#v[1] ~= 0 and #k[1] == 0))
+    if #k[1] ~= 0 and #v[1] ~= 0 then
+      -- Updating the reverse associations map
+      local r_content = knowledge.commands[utils.tostring(v[1])] or {first = v, second = {}}
+      r_content.second[utils.tostring(k[1])] = k
+      knowledge.commands[utils.tostring(v[1])] = r_content
 
-      local content = knowledge.pairs[utils.tostring(k)] or {first = k, second = {}}
-      content.second[utils.tostring(v)] = v
-      knowledge.pairs[utils.tostring(k)] = content
+      -- Updating the associations map
+      local content = knowledge.pairs[utils.tostring(k[1])] or {first = k, second = {}}
+      content.second[utils.tostring(v[1])] = v
+      knowledge.pairs[utils.tostring(k[1])] = content
 
-      for _, w in ipairs(k) do
-        histo[utils.tostring(w)] = (histo[utils.tostring(w)] or 0) + 1
+      -- Updating the histogram of the segments
+      for _, length in ipairs(k) do
+        for _, segment in ipairs(length) do
+          histo[utils.tostring(segment)] = (histo[utils.tostring(segment)] or 0) + 1
+        end
       end
     end
     k, v = keys(), values()
   end
   local occurrencies, values = {}, {}
-  for w, o in pairs(histo) do
-    local t = occurrencies[o] or {}
+  for segment, occ in pairs(histo) do
+    local t = occurrencies[occ] or {}
     if #t == 0 then
-      table.insert(values, o)
+      table.insert(values, occ)
     end
-    table.insert(t, w)
-    occurrencies[o] = t
+    table.insert(t, segment)
+    occurrencies[occ] = t
   end
   table.sort(values, function (a, b) return b < a end)
   local lexicon = {}
-  for _, o in ipairs(values) do
-    for _, w in ipairs(occurrencies[o]) do
-      table.insert(lexicon, w)
+  for _, occ in ipairs(values) do
+    for _, segment in ipairs(occurrencies[occ]) do
+      table.insert(lexicon, segment)
     end
   end
   knowledge.histogram = histo

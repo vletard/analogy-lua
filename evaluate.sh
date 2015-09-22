@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if (( $# <= 1 ))
+if (( $# < 1 ))
 then
   echo "Test file(s) missing (requests)" >&2
   exit
@@ -19,23 +19,35 @@ do
   
   for strategy in intra inter both singletons
   do
-    output_file="$root/results_cb${name}_${file}_$strategy"
-    if test -f "$output_file" && ! $overwrite
-    then
-      read -sn 1 -t 10 -p "Output file $output_file already exists, are you sure you want to overwrite it ? (y)es/(n)o/(a)lways/(C)ancel" ans
-      echo
-      if (( $? == 142 ))
+    for dynamic in true false
+    do
+      output_file="$root/results_cb${name}_${file}_$strategy"
+      if $dynamic
       then
-        ans=C
+        output_file=${output_file}_dynamic
       fi
-      case $ans in
-        "y"|"Y") echo "overwriting" ;;
-        "n"|"N") echo "skipping file"; continue ;;
-        "a"|"A") echo "overwriting all files"; overwrite=true ;;
-        *) echo "aborting"; break ;;
-      esac
-    fi
-    time ./main.lua $strategy < $1 > $output_file
+      if test -f "$output_file" && ! $overwrite
+      then
+        read -sn 1 -t 10 -p "Output file $output_file already exists, are you sure you want to overwrite it ? (y)es/(n)o/(a)lways/(C)ancel" ans
+        echo
+        if (( $? == 142 ))
+        then
+          ans=C
+        fi
+        case $ans in
+          "y"|"Y") echo "overwriting" ;;
+          "n"|"N") echo "skipping file"; continue ;;
+          "a"|"A") echo "overwriting all files"; overwrite=true ;;
+          *) echo "aborting"; break ;;
+        esac
+      fi
+      if $dynamic
+      then
+        time ./main.lua $strategy dynamic < $1 > $output_file
+      else
+        time ./main.lua $strategy < $1 > $output_file
+      fi
+    done
   done
 
   shift
