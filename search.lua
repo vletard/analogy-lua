@@ -124,7 +124,7 @@ function search.build_cubes(request, request_txt)
       end
     end
     local seg, l = g.f()
-    while seg and ((iter <= params.cube_seg_max_iter and #triplets < params.cube_seg_max_triplets2) or not segmentation.dynamic) and l <= params.sube_seg_max_length do
+    while seg and ((iter <= params.cube_seg_max_iter and #triplets < params.cube_seg_max_triplets2) or not segmentation.dynamic) and l <= params.cube_seg_max_length do
       iter = iter + 1
       if appa.count(seg[1], seg[2], seg[3], seg[4]) then
         write("[cube] latency   : "..(g.next.latency or 0).."\n")
