@@ -23,6 +23,9 @@ echo "PROG_number: $PROG_number"
 while [[ "$1" != "" ]]
 do
 
+  test_number=$(md5sum < $1)
+  test_number=${test_number:0:7}
+
   file=$(echo $1 | rev | cut -f1 -d"/" | rev)
   #root=$(echo $1 | rev | cut -f2- -d"/" | rev)
   root=/tmp/
@@ -33,7 +36,7 @@ do
   do
     for dynamic in true false
     do
-      output_file="$root/log_PROG${PROG_number}_CB${CB_number}_${file}_$strategy"
+      output_file="$root/log_PROG${PROG_number}_CB${CB_number}_TEST${test_number}_${file}_$strategy"
       if $dynamic
       then
         output_file=${output_file}_dynamic

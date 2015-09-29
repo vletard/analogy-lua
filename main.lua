@@ -182,25 +182,26 @@ for request_txt in io.lines() do
       table.insert(list, solutions[1].results[1])
       print(string.format("result single%3d \"%s\" -> %s", #list, request_txt, solutions[1].results[1]))
     else
+      print(string.format("detail square    time = %3d   results = %3d          ", square.time, square.nb))
+      print(string.format("detail cube      time = %3d   results = %3d          ", cube.time, cube.nb))
       for _, s in ipairs(solutions) do
         local nb = 0
+        print ""
         for _, r in ipairs(s.results) do
           nb = nb + 1
           if s.square then
             table.insert(list, r.final)
             print(string.format("result square%3d -> %s", #list, r.final))
-            print(string.format("detail triple    x = \"%s\"   y = \"%s\"   z = \"%s\"", r.x, r.y, r.z))
-            print(string.format("detail more      time = %3d   results = %3d          ", square.time, square.nb))
+            print(string.format("detail triple    x = \"%s\"\ty = \"%s\"\tz = \"%s\"", r.x, r.y, r.z))
           else
             table.insert(list, r.t.solution)
             print(string.format("result cube  %3d -> %s", #list, r.t.solution))
-            print(string.format("detail triple O  x = \"%s\"   y = \"%s\"   z = \"%s\"", r.x, r.y, r.z))
-            print(string.format("detail more      time = %3d   results = %3d          ", cube.time, cube.nb))
+            print(string.format("detail triple O  x = \"%s\"\ty = \"%s\"\tz = \"%s\"", r.x, r.y, r.z))
           end
         end
         if not s.square then
 --          print(string.format("result cube1     \"%s\"", request_txt))
-          print(string.format("detail triple I  x = \"%s\"   y = \"%s\"   z = \"%s\"",
+          print(string.format("detail triple I  x = \"%s\"\ty = \"%s\"\tz = \"%s\"",
             s.triple.x,
             s.triple.y,
             s.triple.z
@@ -208,7 +209,7 @@ for request_txt in io.lines() do
 --            segmentation.concat(s.triple.Y.commands[next(s.triple.Y.commands)]), 
 --            segmentation.concat(s.triple.Z.commands[next(s.triple.Z.commands)]) 
           ))
-          print(string.format("detail commands  x = %2d   y = %2d   z = %2d",
+          print(string.format("detail commands  x = %2d\ty = %2d\tz = %2d",
             utils.table.len(s.triple.X.commands),
             utils.table.len(s.triple.Y.commands),
             utils.table.len(s.triple.Z.commands)

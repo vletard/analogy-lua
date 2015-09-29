@@ -226,10 +226,10 @@ function search.build_squares(request, request_txt)
           if #res > 0 then
             local s = res[#res].solution
             table.insert(solutions, { results = { {
-              x = segmentation.concat(s.x, " | "),
-              y = segmentation.concat(s.y, " | "),
-              z = segmentation.concat(s.z, " | "),
-              t = segmentation.concat(s.t, " | "),
+              x = segmentation.concat(s.x, " # "),
+              y = segmentation.concat(s.y, " # "),
+              z = segmentation.concat(s.z, " # "),
+              t = segmentation.concat(s.t, " # "),
               final = segmentation.concat(s.t)
               } }--[[, triple = {
               x = segmentation.concat(pair.first),
