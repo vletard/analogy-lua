@@ -277,11 +277,11 @@ local msg_memoized = {}
 local msg_activate_memoization = false
 -- Takes a list of terminal symbols and builds the aggregation graph of them
 -- The index of the aggregated segments is returned in second position
-local function make_segmentation_graph(sequence)
+function make_segmentation_graph(sequence)
   local symbols = sequence[1]
   local space = modes[sequence.mode].pattern == "%S+" and " " or ""
 
-  if msg_activate_memoization then
+  if msg_activate_memoization then -- If memoization is active, look for a previous computation
     local tmp = msg_memoized[utils.tostring(symbols)]
     if tmp then
       assert(tmp.top, tmp.base, tmp.index)
@@ -294,36 +294,40 @@ local function make_segmentation_graph(sequence)
   local base = nil
   local base_end = nil
   for _, s in ipairs(symbols) do
-    index[s] = { segment = s, next = nil }
+    local struct_seg = { segment = s, next = nil }
+    index[s] = index[s] or {}
+    index[s][struct_seg] = true
     if base_end == nil then
-      base = index[s]
+      base = struct_seg
       base_end = base
     else
       assert(base_end.next == nil)
-      base_end.next = index[s]
+      base_end.next = struct_seg
       base_end = base_end.next
     end
   end
 
-  local top = base
-  while top.next ~= nil do
+  local top = base -- starting from top = base
+  while top.next ~= nil do -- until top has no next
     local new = nil
     local new_end = nil
 
     local current = top
-    while current.next ~= nil do
+    while current.next ~= nil do  -- iterate over the links
       local to_add = current
       while to_add.right do
         to_add = to_add.right
       end
-      to_add = to_add.next
-      local s = current.segment..space..to_add.segment
-      index[s] = { segment = s, next = nil, left = current, right = current.next }
+      to_add = to_add.next  -- get the next of the rightmost element of current
+      local s = current.segment..space..to_add.segment -- compose the new segment by appending the next rightmost terminal to current
+      local struct_seg = { segment = s, next = nil, left = current, right = current.next }
+      index[s] = index[s] or {}
+      index[s][struct_seg] = true
       if new_end == nil then
-        new = index[s]
+        new = struct_seg
         new_end = new
       else
-        new_end.next = index[s]
+        new_end.next = struct_seg
         new_end = new_end.next
       end
       current.top_right     = new_end
@@ -338,197 +342,350 @@ local function make_segmentation_graph(sequence)
   return top, base, index
 end
 
+----------------------------------------------------------------------------
+-- Below are defined functions linked to enumerate_segmentations_list
+----------------------------------------------------------------------------
+
+-- Returns a linked list of the segments in seq (which is a base of segmentation graph)
+local function create_sequence(seq)
+  local new_s = nil
+  local new_s_end = nil
+  local link  = seq
+  while link do
+    if not new_s_end then
+      new_s = { link = link }
+      new_s_end = new_s
+    else
+      new_s_end.next = { link = link }
+      new_s_end = new_s_end.next
+    end
+    link = link.next
+  end
+  return new_s
+end
+
+-- Updates the sequence_list to include the segment seg
+-- Returns the updated list and index or false if the segment cannot be found
+local function update_sequence_list(sequence_list, index, seg)
+--  do
+--    local list = {}
+--    for _, s in ipairs(sequence_list) do
+--      local seq = {}
+--      local item = s
+--      while s do
+--        table.insert(seq, s.link.segment)
+--        s = s.next
+--      end
+--      table.insert(list, seq)
+--    end
+--    local i = {}
+--    for segment, _ in pairs(index) do
+--      i[segment] = true
+--    end
+--    write { removing = seg.segment, from = list, index = i }
+--  end
+
+  do
+    -- Copying the index structure
+    local old_index = index
+    index = {}
+    for segment, links in pairs(old_index) do
+      local map = {}
+      for link, val in pairs(links) do
+        assert(val == true)
+        map[link] = true
+      end
+      index[segment] = map
+    end
+
+    -- Copying the sequence_list structure
+    local old_sequence_list = sequence_list
+    sequence_list = {}
+    for _, s in ipairs(old_sequence_list) do
+      local new = { link = s.link, source = s.source }
+      local new_end = new
+      local item = s.next
+      while item do 
+        new_end.next = { link = item.link, source = item.source }
+        new_end = new_end.next
+        item = item.next
+      end
+      table.insert(sequence_list, new)
+    end
+  end
+
+  index[seg.segment][seg] = nil
+
+  local start = seg
+  local stop  = seg
+
+  -- Establishing start and stop in the terminal subsegments of seg
+  -- TODO update based on the *frontier* rather than based on the terminal segments
+  while start.left do
+    start = start.left
+  end
+  while stop.right do
+    stop = stop.right
+  end
+
+  -- Updating the parallel segment sequences (to merge subsegments into seg)
+  local pending = { link = seg, source = true } -- source means the frontiers of this segment are real (cannot be merged)
+  local witness = 0
+  for j, s in ipairs(sequence_list) do -- for each listed sequence
+    local meta_link = s
+    if s.link == start then -- if its link is the start of the segment
+      sequence_list[j] = pending -- replacing the first item
+      witness = witness + 1 -- and end this step
+    else
+      while meta_link.next do 
+        if meta_link.next.link == start then -- if the next of meta_link is start
+          assert(witness == 0)
+          local tmp = meta_link
+          meta_link = meta_link.next
+          tmp.next = pending -- replace with the merged segment
+          witness = 1 -- and end this step
+          break
+        else
+          meta_link = meta_link.next
+        end
+      end
+    end
+    while meta_link do
+      if meta_link.link == stop then
+        assert(witness == 1)
+        pending.next = meta_link.next
+        witness = 2
+      end
+      meta_link = meta_link.next
+    end
+    assert(witness ~= 1)
+  end
+  assert(witness == 2)
+
+  -- Removing the subsegments of seg from the index
+  while start.top_left or start.top_right do
+    assert(stop.top_right or stop.top_left)
+    local current = start
+    while current ~= stop.next do
+      index[current.segment][current] = nil
+      current = current.next
+    end
+    start = start.top_left or start.top_right
+    stop  = stop.top_right or stop.top_left
+  end
+  assert(start == stop)
+  index[start.segment][start] = nil
+  
+  return sequence_list, index
+end
+
+-- mappings, to_split and seg_i are only recursive parameters
+local function find_segments(segment_list, index, sequence_list, mappings, to_split, seg_i)
+  if not seg_i then
+    -- sequence_list is initially the list of bases of the sequences' segmentation graphs
+    -- it is transformed below into the linked list of the links to the used segments, see create_sequence()
+    local input_sequence_list = sequence_list
+    sequence_list = {}
+    for _, seq in ipairs(input_sequence_list) do
+      table.insert(sequence_list, create_sequence(seq))
+    end
+  end
+
+  local mappings = mappings or {} -- set of results to be returned
+  local to_split = to_split or {} -- set of indexes of invalid segments found
+  local seg_i = seg_i or 1
+
+  local old_index = index
+  local old_sequence_list = sequence_list
+
+
+  local segment = segment_list[seg_i].segment -- select a segment
+  local l = index[segment] or {}  -- search for it in index
+
+  -- If there is no entry of the segment in the index, the segmentation is invalid
+  if utils.table.len(l) == 0 then
+    to_split[seg_i] = true
+  else
+    for seg, _ in pairs(l) do
+      local new_sequence_list, new_index = update_sequence_list(sequence_list, index, seg)
+      assert(new_sequence_list)
+
+      if seg_i < #segment_list then
+        find_segments(segment_list, new_index, new_sequence_list, mappings, to_split, seg_i + 1)
+      else
+        table.insert(mappings, { sequence_list = new_sequence_list})
+      end
+    end
+  end
+  return mappings, to_split
+end
+
 -- Enumerates the segmentations of the sequence more efficiently thanks to the list of target sequences provided
-function _segmentation.enumerate_segmentations_list(sequence, list)
+-- The opposite sequence is optional, if provided, the returned function will output a third item for the segmented opposite
+function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
   local space = modes[sequence.mode].pattern == "%S+" and " " or ""
 
-  local sequence_top, sequence_base, sequence_index = make_segmentation_graph(sequence)
-  local list_index  = {}
-  local list_bases  = {}
-  local list_spaces = {}
+  local sequence_top, sequence_base, _ = make_segmentation_graph(sequence) -- Links for the segmentation graph
+  local list_index  = {}  -- Index of the segments in the sequences from the list
+  local list_bases  = {}  -- Base link for the segmentation graph of each sequence in the list
+  local list_spaces = {}  -- Character to be inserted between segments for each sequence in the list
 
+  -- Make segmentation graphs for all sequences in the list
   for i, s in ipairs(list) do
     table.insert(list_spaces, modes[s.mode].pattern == "%S+" and " " or "")
     local _, base, index = make_segmentation_graph(s)
-    for segment, link in pairs(index) do
-      local sublist = list_index[segment] or {}
-      assert(not sublist[link])
-      sublist[link] = true
-      list_index[segment] = sublist
+    for segment_txt, links in pairs(index) do
+      local sublist = list_index[segment_txt] or {}
+      for link, _ in pairs(links) do
+        assert(not sublist[link])
+        sublist[link] = true
+      end
+      list_index[segment_txt] = sublist
     end
     table.insert(list_bases, base)
   end
 
-  local segmentations = { segment_list = { sequence_top }, next = nil }
-  local segmentations_last = segmentations
-
-  local function find_segments(segment_list, index, sequence_list)
-    do
-      local old_index = index
-      index = {}
-      for segment, links in pairs(old_index) do
-        local map = {}
-        for link, val in pairs(links) do
-          assert(val == true)
-          map[link] = true
-        end
-        index[segment] = map
+  local opposite_sequence, opposite_index
+  if opposite then
+    local _, base, index = make_segmentation_graph(opposite)
+    opposite_index = {}
+    for segment_txt, links in pairs(index) do
+      local new_links = {}
+      for l, _ in pairs(links) do
+        new_links[l] = true
       end
-      
-      local old_sequence_list = sequence_list
-      sequence_list = {}
-      for _, s in ipairs(old_sequence_list) do
-        local new_s = nil
-        local new_s_end = nil
-        local link  = s
-        while link do
-          if not new_s_end then
-            new_s = { link = link }
-            new_s_end = new_s
-          else
-            new_s_end.next = { link = link }
-            new_s_end = new_s_end.next
-          end
-          link = link.next
-        end
-        table.insert(sequence_list, new_s)
-      end
+      opposite_index[segment_txt] = new_links
     end
-
-    -- Checking each segment of the submitted list
-    for i, segment_box in ipairs(segment_list) do
-      local segment = segment_box.segment
-      local l = index[segment] or {}
-
-      -- If there is no entry of the segment in the index, the segmentation is invalid
-      if utils.table.len(l) == 0 then
-        return false, false, i
-      else
-        local seg = next(l)
-        local start = seg
-        local stop  = seg
-
-        -- Establishing start and stop in the terminal subsegments of seg
-        while start.left do
-          start = start.left
-        end
-        while stop.right do
-          stop = stop.right
-        end
-        
-        -- Updating the parallel segment sequences (to merge subsegments into seg)
-        local pending = { link = seg, source = true }
-        local witness = 0
-        for j, s in ipairs(sequence_list) do
-          local meta_link = s
-          if s.link == start then
-            sequence_list[j] = pending
-            witness = witness + 1
-          else
-            while meta_link.next do
-              if meta_link.next.link == start then
-                assert(witness == 0)
-                local tmp = meta_link
-                meta_link = meta_link.next
-                tmp.next = pending
-                witness = 1
-                break
-              else
-                meta_link = meta_link.next
-              end
-            end
-          end
-          while meta_link do
-            if meta_link.link == stop then
-              assert(witness == 1)
-              pending.next = meta_link.next
-              witness = 2
-            end
-            meta_link = meta_link.next
-          end
-          assert(witness ~= 1)
-        end
-        assert(witness == 2)
-
-        while start.top_left or start.top_right do
-          assert(stop.top_right or stop.top_left)
-          local current = start
-          while current ~= stop.next do
-            index[current.segment][current] = nil
-            current = current.next
-          end
-          start = start.top_left or start.top_right
-          stop  = stop.top_right or stop.top_left
-        end
-        assert(start == stop)
-        index[start.segment][start] = nil
-      end
-    end
-    return index, sequence_list
+    opposite_sequence = create_sequence(base)
   end
 
-  return function ()
-    if segmentations == nil then
-      return nil
-    end
-    local index, sequence_list, to_split = find_segments(segmentations.segment_list, list_index, list_bases)
-    while not index do
-      assert(type(to_split) == "number")
 
-      local top_down_left = segmentations.segment_list[to_split].left
-      local bottom_up_right = segmentations.segment_list[to_split]
-      while bottom_up_right.right do
-        bottom_up_right = bottom_up_right.right
-      end
-      while top_down_left do
-        assert(top_down_left.segment..space..bottom_up_right.segment == segmentations.segment_list[to_split].segment)
-        local s_l = {}
-        for i=1,to_split-1 do
-          table.insert(s_l, segmentations.segment_list[i])
+  local segmentations = { segment_list = { sequence_top }, next = nil } -- Queue of segmentations to be examined
+  local segmentations_last = segmentations  -- End of queue
+
+  local mappings = {}
+  local output
+
+  return function ()
+    local valid = false
+    local result_list, result_opposite
+
+    while not valid do
+      valid = true
+
+      while #mappings == 0 do
+        if segmentations == nil then
+          return nil  -- No more segmentation to make nor return
         end
-        table.insert(s_l, top_down_left)
-        table.insert(s_l, bottom_up_right)
-        for i=to_split+1,#segmentations.segment_list do
-          table.insert(s_l, segmentations.segment_list[i])
+        local to_split
+        mappings, to_split = find_segments(segmentations.segment_list, list_index, list_bases) -- Looking for a valid set of segments 
+        for splt, _ in pairs(to_split) do
+--        while not index do    -- If none is found, look into the queue
+          assert(type(splt) == "number") -- splt is the index of a segment not found
+          
+          local top_down_left = segmentations.segment_list[splt].left
+          local bottom_up_right = segmentations.segment_list[splt]
+          while bottom_up_right.right do  -- Finding the "right"most segment in the graph
+            bottom_up_right = bottom_up_right.right
+          end
+          while top_down_left do
+            assert(top_down_left.segment..space..bottom_up_right.segment == segmentations.segment_list[splt].segment)
+            local s_l = {}
+            for i=1,splt-1 do -- add all the segments before the one to split
+              table.insert(s_l, segmentations.segment_list[i])
+            end
+            table.insert(s_l, top_down_left) -- the first chunk
+            table.insert(s_l, bottom_up_right) -- the second one
+            for i=splt+1,#segmentations.segment_list do -- then all the segments after the one splitted
+              table.insert(s_l, segmentations.segment_list[i])
+            end
+            segmentations_last.next = { segment_list = s_l, next = nil }
+            segmentations_last = segmentations_last.next
+            top_down_left = top_down_left.left
+            bottom_up_right = bottom_up_right.top_left
+          end
         end
-        segmentations_last.next = { segment_list = s_l, next = nil }
-        segmentations_last = segmentations_last.next
-        top_down_left = top_down_left.left
-        bottom_up_right = bottom_up_right.top_left
-      end
-      segmentations = segmentations.next
-      if not segmentations then
-        return nil
-      end
-      assert(type(segmentations.segment_list) == "table")
-      index, sequence_list, to_split = find_segments(segmentations.segment_list, list_index, list_bases)
-    end
-    local s = segmentations
-    segmentations = segmentations.next
-    local output = { {}, mode = sequence.mode }
-    for _, item in ipairs(s.segment_list) do
-      table.insert(output[1], item.segment)
-    end
-    
-    local result_list = {}
-    for i, meta_link in ipairs(sequence_list) do
-      local result = { {}, mode = list[i].mode }
-      local source = true
-      while meta_link do
-        if meta_link.source == true then
-          table.insert(result[1], meta_link.link.segment)
-          source = true
-        elseif source == true then
-          table.insert(result[1], meta_link.link.segment)
-          source = false
-        else
-          result[1][#result[1]] = result[1][#result[1]]..list_spaces[i]..meta_link.link.segment
+        local s = segmentations
+        output = { {}, mode = sequence.mode }
+        for _, item in ipairs(s.segment_list) do
+          table.insert(output[1], item.segment)
         end
-        meta_link = meta_link.next
+        segmentations = segmentations.next
       end
-      table.insert(result_list, result)
+      
+      local m = mappings[#mappings]
+      mappings[#mappings] = nil
+      local sequence_list = m.sequence_list
+      
+      local local_opposite_sequence = opposite_sequence
+      local local_opposite_index    = opposite_index
+
+      result_list = {}
+      for i, s in ipairs(sequence_list) do
+        local result = { {}, mode = list[i].mode }
+        local source = true
+        local meta_link = s
+        while meta_link do
+          if meta_link.source == true then
+
+            -- if opposite is provided and we just finished merging a segment
+            if opposite and source == false then
+              local seg_choice = local_opposite_index[result[1][#result[1]]] -- looking for thelast merged segment in the index of opposite
+              if seg_choice then
+                assert(utils.table.len(seg_choice) == 1)
+                local previous = next(seg_choice)
+                local sequence_list
+                sequence_list, local_opposite_index = update_sequence_list({local_opposite_sequence}, local_opposite_index, previous)
+                assert(sequence_list)
+                assert(#sequence_list == 1)
+                local_opposite_sequence = sequence_list[1]
+              else
+                valid = false
+              end
+            end
+
+            table.insert(result[1], meta_link.link.segment)
+            source = true
+          elseif source == true then
+            table.insert(result[1], meta_link.link.segment)
+            source = false
+          else
+            result[1][#result[1]] = result[1][#result[1]]..list_spaces[i]..meta_link.link.segment
+          end
+          meta_link = meta_link.next
+        end
+        if opposite and source == false then
+          local seg_choice = local_opposite_index[result[1][#result[1]]] -- looking for thelast merged segment in the index of opposite
+          write_depth(2, local_opposite_index)
+          write(result[1][#result[1]])
+          if seg_choice then
+            assert(utils.table.len(seg_choice) == 1)
+            local previous = next(seg_choice)
+            local sequence_list
+            sequence_list, local_opposite_index = update_sequence_list({local_opposite_sequence}, local_opposite_index, previous)
+            assert(sequence_list)
+            assert(#sequence_list == 1)
+            local_opposite_sequence = sequence_list[1]
+          else
+            valid = false
+          end
+        end
+
+        table.insert(result_list, result)
+      end
+
+      result_opposite = {{}}
+      if opposite then
+        local item = local_opposite_sequence
+        while item do
+          table.insert(result_opposite[1], item.link.segment)
+          item = item.next
+        end
+      end
     end
-    return output, result_list
+
+    -- TODO fix the duplicate outputs
+    return output, result_list, result_opposite
   end
 end
 
