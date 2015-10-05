@@ -147,7 +147,7 @@ local function preselect_matching_segments(seq1, seq2, output)
 end
 
 function _segmentation.preselect_matching_segments(seq1, seq2)
---  error "Function actually in use !"
+  error "Function actually in use !"
   local output = {}
   local min = math.huge
   for _, item in pairs(preselect_matching_segments(seq1, seq2)) do
@@ -367,24 +367,6 @@ end
 -- Updates the sequence_list to include the segment seg
 -- Returns the updated list and index or false if the segment cannot be found
 local function update_sequence_list(sequence_list, index, seg)
---  do
---    local list = {}
---    for _, s in ipairs(sequence_list) do
---      local seq = {}
---      local item = s
---      while s do
---        table.insert(seq, s.link.segment)
---        s = s.next
---      end
---      table.insert(list, seq)
---    end
---    local i = {}
---    for segment, _ in pairs(index) do
---      i[segment] = true
---    end
---    write { removing = seg.segment, from = list, index = i }
---  end
-
   do
     -- Copying the index structure
     local old_index = index
@@ -494,10 +476,6 @@ local function find_segments(segment_list, index, sequence_list, mappings, to_sp
   local mappings = mappings or {} -- set of results to be returned
   local to_split = to_split or {} -- set of indexes of invalid segments found
   local seg_i = seg_i or 1
-
-  local old_index = index
-  local old_sequence_list = sequence_list
-
 
   local segment = segment_list[seg_i].segment -- select a segment
   local l = index[segment] or {}  -- search for it in index
@@ -630,7 +608,7 @@ function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
 
             -- if opposite is provided and we just finished merging a segment
             if opposite and source == false then
-              local seg_choice = local_opposite_index[result[1][#result[1]]] -- looking for thelast merged segment in the index of opposite
+              local seg_choice = local_opposite_index[result[1][#result[1]]] -- looking for the last merged segment in the index of opposite
               if seg_choice then
                 assert(utils.table.len(seg_choice) == 1)
                 local previous = next(seg_choice)
@@ -655,9 +633,7 @@ function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
           meta_link = meta_link.next
         end
         if opposite and source == false then
-          local seg_choice = local_opposite_index[result[1][#result[1]]] -- looking for thelast merged segment in the index of opposite
-          write_depth(2, local_opposite_index)
-          write(result[1][#result[1]])
+          local seg_choice = local_opposite_index[result[1][#result[1]]] -- looking for the last merged segment in the index of opposite
           if seg_choice then
             assert(utils.table.len(seg_choice) == 1)
             local previous = next(seg_choice)
@@ -676,6 +652,7 @@ function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
 
       result_opposite = {{}}
       if opposite then
+        result_opposite.mode = opposite.mode
         local item = local_opposite_sequence
         while item do
           table.insert(result_opposite[1], item.link.segment)

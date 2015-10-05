@@ -58,10 +58,20 @@ local function enumerate_valid_triplets(request)
       if appa.count(pair.first, res_pair.first, res_pair.second, request) then
         local f
         if segmentation.dynamic then
-          f = segmentation.enumerate_analogical_segmentations(pair.first, res_pair.first, res_pair.second, request)
+          local f_ = segmentation.enumerate_segmentations_list(request, { res_pair.first, res_pair.second }, pair.first)
+          f = function ()
+            local seg, list, opposite = f_()
+            if not seg then
+              return nil
+            else
+              assert(#list == 2)
+              assert(opposite)
+              return { opposite, list[1], list[2], seg }
+            end
+          end
         else
           local unique_seg = { pair.first, res_pair.first, res_pair.second, request }
-          f = function () local res = unique_seg; unique_seg = nil; return res end
+          f = function () local res = unique_seg; return res end
         end
         local triplet = {
           x = {
@@ -116,7 +126,7 @@ function search.build_cubes(request, request_txt)
     while g.next ~= g and ((iter <= params.cube_seg_max_iter and #triplets < params.cube_seg_max_triplets2) or not segmentation.dynamic) do
       iter = iter + 1
       local seg, l = g.next.f()
-      if seg and l <= params.cube_seg_max_length then
+      if seg then --and l <= params.cube_seg_max_length then
         if appa.count(seg[1], seg[2], seg[3], seg[4]) then
           write("[cube] latency   : "..(g.next.latency or 0).."\n")
           table.insert(triplets, g.next.triplet)
@@ -136,7 +146,7 @@ function search.build_cubes(request, request_txt)
       end
     end
     local seg, l = g.f()
-    while seg and ((iter <= params.cube_seg_max_iter and #triplets < params.cube_seg_max_triplets2) or not segmentation.dynamic) and l <= params.cube_seg_max_length do
+    while seg and ((iter <= params.cube_seg_max_iter and #triplets < params.cube_seg_max_triplets2) or not segmentation.dynamic) do --and l <= params.cube_seg_max_length do
       iter = iter + 1
       if appa.count(seg[1], seg[2], seg[3], seg[4]) then
         write("[cube] latency   : "..(g.next.latency or 0).."\n")
