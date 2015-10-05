@@ -1,4 +1,4 @@
-#!/usr/bin/env lua
+#!/people/letard/local/bin/lua
 
 dofile "/people/letard/local/lib/lua/toolbox.lua"
 knowledge    = dofile "knowledge.lua"
@@ -22,7 +22,7 @@ local key_file, value_file
 
 if #arg < 3 then
   io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE ANALOGICAL_MODE [dynamic]")
-  io.stderr:write("\nANALOGICAL_MODE is one of intra, inter, both, singletons")
+  io.stderr:write("\nANALOGICAL_MODE is one of intra, inter, both, singletons\n\n")
   os.exit()
 end
 key_file   = arg[1]
@@ -88,6 +88,13 @@ search.set_log  ( true)
 
 --------------------------------------------------------------------------------
 
+local time_unit = 1000000000
+local function get_time()
+  local s, ns = os.time()
+  assert(type(ns) == "number")
+  return 1000000000*s + ns
+end
+
 local function load_files(keys, values)
   local key_file   = io.open(keys)
   local value_file = io.open(values)
@@ -126,7 +133,7 @@ for request_txt in io.lines() do
 
   local square = { time = 0, nb = 0 }
   local cube   = { time = 0, nb = 0, unknown = {} }
-  local time = os.time()
+  local time = get_time()
   local solutions = {}
   local existing = knowledge.pairs[utils.tostring(request[1])]
   if existing then
@@ -138,23 +145,23 @@ for request_txt in io.lines() do
   else
     local loc_time
     if use_squares then
-      loc_time = os.time()
+      loc_time = get_time()
       local squares = search.build_squares(request, request_txt)
       for _, s in ipairs(squares) do
         table.insert(solutions, s)
         square.nb = square.nb + 1
       end
-      square.time = os.time() - loc_time
+      square.time = get_time() - loc_time
     end
     if use_cubes then
-      loc_time = os.time()
+      loc_time = get_time()
       local cubes
       cubes, cube.unknown = search.build_cubes(request, request_txt)
       for _, s in ipairs(cubes) do
         table.insert(solutions, s)
         cube.nb = cube.nb + 1
       end
-      cube.time = os.time() - loc_time
+      cube.time = get_time() - loc_time
     end
   end
 
@@ -182,8 +189,8 @@ for request_txt in io.lines() do
       table.insert(list, solutions[1].results[1])
       print(string.format("result single%3d \"%s\" -> %s", #list, request_txt, solutions[1].results[1]))
     else
-      print(string.format("detail square    time = %3d   results = %3d          ", square.time, square.nb))
-      print(string.format("detail cube      time = %3d   results = %3d          ", cube.time, cube.nb))
+      print(string.format("detail square    time = %.3f   results = %3d          ", square.time / time_unit, square.nb))
+      print(string.format("detail cube      time = %.3f   results = %3d          ", cube.time / time_unit, cube.nb))
       for _, s in ipairs(solutions) do
         local nb = 0
         print ""
@@ -225,7 +232,7 @@ for request_txt in io.lines() do
       print(string.format("result not found \"%s\"", request_txt))
     end
   end
-  print(string.format("detail totaltime %3d", os.time() - time))
+  print(string.format("detail totaltime %.3f", (get_time() - time) / time_unit ))
   print(string.format("final %s", #list > 0 and list[math.random(#list)] or ""))  -- TODO better choice !!!!
   print ""
 
