@@ -122,7 +122,7 @@ local function complement(s, x, prefix, i, j, result)
   return result
 end
 
--- Checks whether the counts of the terminal symbols of the sequences in parameter are invalid for analogy or not.
+-- Checks whether the counts of the terminal symbols of the sequences in parameter are valid for analogy or not.
 -- Note that the sequence D is optional, if absent, the triplet is checked for counts inequality.
 -- 
 -- The actual half-count per segment is returned in second place.
@@ -179,21 +179,16 @@ function appa.solve(A, B, C)
     end
   end
 
-  local first_seg, result_list = segmentation.enumerate_segmentations_list(A, {B, C})()
-  if first_seg == nil then
-    return {}
+  if segmentation.dynamic_square then
+    local first_seg, result_list = segmentation.enumerate_segmentations_list(A, {B, C})()
+    if first_seg == nil then
+      return {}
+    end
+
+    A = first_seg
+    B = result_list[1]
+    C = result_list[2]
   end
-  
---  write "\n"
---  write(first_seg)
---  write(result_list)
---  write "\n"
-
---  if true then return {} end
-
-  A = first_seg
-  B = result_list[1]
-  C = result_list[2]
 
   local solutions = {} -- index of the solutions and there occurrences
   local max = {}       -- holds the n solutions having the biggest numbers of occurrences (string representations)

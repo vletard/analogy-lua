@@ -402,7 +402,6 @@ local function update_sequence_list(sequence_list, index, seg)
   local stop  = seg
 
   -- Establishing start and stop in the terminal subsegments of seg
-  -- TODO update based on the *frontier* rather than based on the terminal segments
   while start.left do
     start = start.left
   end
@@ -500,8 +499,10 @@ end
 
 -- Enumerates the segmentations of the sequence more efficiently thanks to the list of target sequences provided
 -- The opposite sequence is optional, if provided, the returned function will output a third item for the segmented opposite
-function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
+-- max_segments specifies the maximum number of segments for sequence to be divided in
+function _segmentation.enumerate_segmentations_list(sequence, list, opposite, max_segments)
   local space = modes[sequence.mode].pattern == "%S+" and " " or ""
+  local max_segments = max_segments or math.huge
 
   local sequence_top, sequence_base, _ = make_segmentation_graph(sequence) -- Links for the segmentation graph
   local list_index  = {}  -- Index of the segments in the sequences from the list
@@ -523,9 +524,10 @@ function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
     table.insert(list_bases, base)
   end
 
-  local opposite_sequence, opposite_index
+  local opposite_base, opposite_index
   if opposite then
     local _, base, index = make_segmentation_graph(opposite)
+    opposite_base = base
     opposite_index = {}
     for segment_txt, links in pairs(index) do
       local new_links = {}
@@ -534,9 +536,7 @@ function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
       end
       opposite_index[segment_txt] = new_links
     end
-    opposite_sequence = create_sequence(base)
   end
-
 
   local segmentations = { segment_list = { sequence_top }, next = nil } -- Queue of segmentations to be examined
   local segmentations_last = segmentations  -- End of queue
@@ -557,30 +557,31 @@ function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
         end
         local to_split
         mappings, to_split = find_segments(segmentations.segment_list, list_index, list_bases) -- Looking for a valid set of segments 
-        for splt, _ in pairs(to_split) do
---        while not index do    -- If none is found, look into the queue
-          assert(type(splt) == "number") -- splt is the index of a segment not found
-          
-          local top_down_left = segmentations.segment_list[splt].left
-          local bottom_up_right = segmentations.segment_list[splt]
-          while bottom_up_right.right do  -- Finding the "right"most segment in the graph
-            bottom_up_right = bottom_up_right.right
-          end
-          while top_down_left do
-            assert(top_down_left.segment..space..bottom_up_right.segment == segmentations.segment_list[splt].segment)
-            local s_l = {}
-            for i=1,splt-1 do -- add all the segments before the one to split
-              table.insert(s_l, segmentations.segment_list[i])
+        if #segmentations.segment_list < max_segments then
+          for splt, _ in pairs(to_split) do  -- for each segment to be subdivided
+            assert(type(splt) == "number") -- splt is the index of a segment not found
+            
+            local top_down_left = segmentations.segment_list[splt].left
+            local bottom_up_right = segmentations.segment_list[splt]
+            while bottom_up_right.right do  -- Finding the "right"most segment in the graph
+              bottom_up_right = bottom_up_right.right
             end
-            table.insert(s_l, top_down_left) -- the first chunk
-            table.insert(s_l, bottom_up_right) -- the second one
-            for i=splt+1,#segmentations.segment_list do -- then all the segments after the one splitted
-              table.insert(s_l, segmentations.segment_list[i])
+            while top_down_left do
+              assert(top_down_left.segment..space..bottom_up_right.segment == segmentations.segment_list[splt].segment)
+              local s_l = {}
+              for i=1,splt-1 do -- add all the segments before the one to split
+                table.insert(s_l, segmentations.segment_list[i])
+              end
+              table.insert(s_l, top_down_left) -- the first chunk
+              table.insert(s_l, bottom_up_right) -- the second one
+              for i=splt+1,#segmentations.segment_list do -- then all the segments after the one splitted
+                table.insert(s_l, segmentations.segment_list[i])
+              end
+              segmentations_last.next = { segment_list = s_l, next = nil }
+              segmentations_last = segmentations_last.next
+              top_down_left = top_down_left.left
+              bottom_up_right = bottom_up_right.top_left
             end
-            segmentations_last.next = { segment_list = s_l, next = nil }
-            segmentations_last = segmentations_last.next
-            top_down_left = top_down_left.left
-            bottom_up_right = bottom_up_right.top_left
           end
         end
         local s = segmentations
@@ -595,11 +596,11 @@ function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
       mappings[#mappings] = nil
       local sequence_list = m.sequence_list
       
-      local local_opposite_sequence = opposite_sequence
-      local local_opposite_index    = opposite_index
+      local opposite_segments = {}
 
       result_list = {}
       for i, s in ipairs(sequence_list) do
+
         local result = { {}, mode = list[i].mode }
         local source = true
         local meta_link = s
@@ -608,18 +609,7 @@ function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
 
             -- if opposite is provided and we just finished merging a segment
             if opposite and source == false then
-              local seg_choice = local_opposite_index[result[1][#result[1]]] -- looking for the last merged segment in the index of opposite
-              if seg_choice then
-                assert(utils.table.len(seg_choice) == 1)
-                local previous = next(seg_choice)
-                local sequence_list
-                sequence_list, local_opposite_index = update_sequence_list({local_opposite_sequence}, local_opposite_index, previous)
-                assert(sequence_list)
-                assert(#sequence_list == 1)
-                local_opposite_sequence = sequence_list[1]
-              else
-                valid = false
-              end
+              table.insert(opposite_segments, { segment = result[1][#result[1]] } ) -- inserting a segment-shaped item for the needs of the function
             end
 
             table.insert(result[1], meta_link.link.segment)
@@ -633,30 +623,27 @@ function _segmentation.enumerate_segmentations_list(sequence, list, opposite)
           meta_link = meta_link.next
         end
         if opposite and source == false then
-          local seg_choice = local_opposite_index[result[1][#result[1]]] -- looking for the last merged segment in the index of opposite
-          if seg_choice then
-            assert(utils.table.len(seg_choice) == 1)
-            local previous = next(seg_choice)
-            local sequence_list
-            sequence_list, local_opposite_index = update_sequence_list({local_opposite_sequence}, local_opposite_index, previous)
-            assert(sequence_list)
-            assert(#sequence_list == 1)
-            local_opposite_sequence = sequence_list[1]
-          else
-            valid = false
-          end
+          table.insert(opposite_segments, { segment = result[1][#result[1]] } )
         end
 
         table.insert(result_list, result)
       end
 
-      result_opposite = {{}}
       if opposite then
-        result_opposite.mode = opposite.mode
-        local item = local_opposite_sequence
-        while item do
-          table.insert(result_opposite[1], item.link.segment)
-          item = item.next
+
+        local opposite_mapping, opposite_to_split = find_segments(opposite_segments, opposite_index, {opposite_base})
+        if #opposite_mapping > 0 then
+--          assert(utils.table.len(opposite_to_split) == 0)
+
+          result_opposite = {{}}
+          result_opposite.mode = opposite.mode
+          local item = opposite_mapping[1].sequence_list[1]  -- Only the first mapping is used, TODO how to use the whole list in order to precompute analogies ?
+          while item do
+            table.insert(result_opposite[1], item.link.segment)
+            item = item.next
+          end
+        else
+          valid = false
         end
       end
     end

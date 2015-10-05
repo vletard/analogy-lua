@@ -1,13 +1,29 @@
-local search = {}
+local search = {
+  static_cut = false
+}
 
 local params = {
-  cube_seg_max_iter      = 10000,
-  cube_seg_max_length    = math.huge,
-  cube_seg_max_triplets1 = math.huge,
-  cube_seg_max_triplets2 = math.huge,
-  debug = false,
-  log   = false,
+  cube_seg_max_iter_without = math.huge,
+  cube_seg_max_iter_with    = math.huge,
+  cube_seg_max_time_without = 8,
+  cube_seg_max_time_with    = 4,
+--  cube_seg_max_length       = math.huge,
+  cube_seg_max_triplets1    = math.huge,
+  cube_seg_max_triplets2    = math.huge,
+  cube_seg_max_segments     = 4,
+  debug =  true,
+  log   =  true,
 }
+
+local function check_stop_params(iter, time, nb_triplets)
+  if not segmentation.dynamic_cube and not search.static_cut then
+    return true
+  elseif nb_triplets > 0 then
+    return (iter <= params.cube_seg_max_iter_with    and (os.time() - time) <= params.cube_seg_max_time_with   )
+  else
+    return (iter <= params.cube_seg_max_iter_without and (os.time() - time) <= params.cube_seg_max_time_without)
+  end
+end
 
 local stack = ""
 local write = function(arg)
@@ -45,20 +61,20 @@ search.set_debug(params.debug)
 -- Returns the list of enumeration functions for each valid triplet found in the knowledge base for the given request.
 local function enumerate_valid_triplets(request)
   local generators_start, generators_end
-  local counter = 0
+  local triplets = {}
   for _, pair in pairs(knowledge.pairs) do
-    if counter >= params.cube_seg_max_triplets1 then
+    if #triplets >= params.cube_seg_max_triplets1 then
       break
     end
     local res = knowledge.retrieve(request, pair.first)
     for _, res_pair in ipairs(res) do
-      if counter >= params.cube_seg_max_triplets1 then
+      if #triplets >= params.cube_seg_max_triplets1 then
         break
       end
       if appa.count(pair.first, res_pair.first, res_pair.second, request) then
         local f
-        if segmentation.dynamic then
-          local f_ = segmentation.enumerate_segmentations_list(request, { res_pair.first, res_pair.second }, pair.first)
+        if segmentation.dynamic_cube then
+          local f_ = segmentation.enumerate_segmentations_list(request, { res_pair.first, res_pair.second }, pair.first, params.cube_seg_max_segments)
           f = function ()
             local seg, list, opposite = f_()
             if not seg then
@@ -87,19 +103,22 @@ local function enumerate_valid_triplets(request)
             commands = knowledge.pairs[utils.tostring(res_pair.second[1])].second,
           }
         }
-        if not generators_end then
-          generators_end = { f = f, triplet = triplet }
-          generators_start = generators_end
-          counter = 1
-        else
-          generators_end.next = { f = f, triplet = triplet }
-          generators_end = generators_end.next
-          counter = counter + 1
-        end
+        table.insert(triplets, { f = f, triplet = triplet })
       end
     end
   end
-  log("[cube] triplets retrieved : "..counter.."\n")
+--  utils.table.shuffle(triplets)  -- evenly distribute the triplets in case of computation cut
+  for _, t in ipairs(triplets) do
+    if not generators_end then
+      generators_end = t
+      generators_start = generators_end
+    else
+      generators_end.next = t
+      generators_end = generators_end.next
+    end
+  end
+
+  log("[cube] triplets retrieved : "..#triplets.."\n")
   if generators_end then
     generators_end.next = generators_start
   end
@@ -123,7 +142,7 @@ function search.build_cubes(request, request_txt)
   local iter      = 0
   if g then
     local discarded = 0
-    while g.next ~= g and ((iter <= params.cube_seg_max_iter and #triplets < params.cube_seg_max_triplets2) or not segmentation.dynamic) do
+    while g.next ~= g and check_stop_params(iter, time, #triplets) do
       iter = iter + 1
       local seg, l = g.next.f()
       if seg then --and l <= params.cube_seg_max_length then
@@ -146,7 +165,7 @@ function search.build_cubes(request, request_txt)
       end
     end
     local seg, l = g.f()
-    while seg and ((iter <= params.cube_seg_max_iter and #triplets < params.cube_seg_max_triplets2) or not segmentation.dynamic) do --and l <= params.cube_seg_max_length do
+    while seg and check_stop_params(iter, time, #triplets) do
       iter = iter + 1
       if appa.count(seg[1], seg[2], seg[3], seg[4]) then
         write("[cube] latency   : "..(g.next.latency or 0).."\n")

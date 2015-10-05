@@ -10,7 +10,7 @@ segmentation = dofile "segmentation.lua"
 --------------------------------------------------------------------------------
 -- Parameters
 
-segmentation.set_mode("words_dynamic")
+segmentation.set_mode("words")
 local interactive            = false
 
 
@@ -20,9 +20,10 @@ local interactive            = false
 local key_file, value_file
 
 
-if #arg < 3 then
-  io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE ANALOGICAL_MODE [dynamic]")
-  io.stderr:write("\nANALOGICAL_MODE is one of intra, inter, both, singletons\n\n")
+if #arg < 4 then
+  io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE ANALOGICAL_MODE SEGMENTATION_MODE")
+  io.stderr:write("\n  ANALOGICAL_MODE is one of intra, inter, both, singletons")
+  io.stderr:write("\nSEGMENTATION_MODE is one of static, static-cut, dynamic, dynamic-cube, dynamic-square\n\n")
   os.exit()
 end
 key_file   = arg[1]
@@ -43,13 +44,18 @@ else
   io.stderr:write("Third argument is incorrect ('"..arg[1].."')\n")
   os.exit()
 end
-if #arg >= 4 then
-  if arg[4] == "dynamic" then
-    segmentation.dynamic = true
-  else
-    io.stderr:write("Fourth argument is incorrect ('"..arg[1].."'): must be 'dynamic' or nothing.\n")
-    os.exit()
-  end
+if arg[4] == "dynamic" then
+  segmentation.dynamic_cube = true
+  segmentation.dynamic_square = true
+elseif arg[4] == "dynamic-cube" then
+  segmentation.dynamic_cube = true
+elseif arg[4] == "dynamic-square" then
+  segmentation.dynamic_square = true
+elseif arg[4] == "static-cut" then
+  search.static_cut = true
+elseif arg[4] ~= "static" then
+  io.stderr:write("Fourth argument is incorrect ('"..arg[1].."').\n")
+  os.exit()
 end
 
 -- local   key_file = 
