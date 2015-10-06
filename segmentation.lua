@@ -27,6 +27,10 @@ function _segmentation.set_mode(new_mode)
   mode = new_mode
 end
 
+function _segmentation.get_mode()
+  return mode
+end
+
 -- Segmenting the given character strings and returns a table of the results.
 -- If only one string is passed, directly returns the sequence of symbols (rather than the list of sequences)
 function _segmentation.chunk(mode, ...)
@@ -74,7 +78,8 @@ function _segmentation.chunk_NL(...)
 end
 
 function _segmentation.chunk_FL(...)
-  return _segmentation.chunk("words", ...)
+  return _segmentation.chunk(mode, ...)
+--  return _segmentation.chunk("words", ...)
 end
 
 -- Concatenates the given list of symbols into a string

@@ -9,6 +9,7 @@ local params = {
   min_coef      =   100,               -- Ratio minimal entre les deux meilleures occurrences : 1 + min_coef / meilleure_occurrence
   timeout       =     1,
   debug         = false,
+  max_segments  = 5
 }
 
 math.randomseed(os.time())
@@ -180,7 +181,7 @@ function appa.solve(A, B, C)
   end
 
   if segmentation.dynamic_square then
-    local first_seg, result_list = segmentation.enumerate_segmentations_list(A, {B, C})()
+    local first_seg, result_list = segmentation.enumerate_segmentations_list(A, {B, C}, nil, params.max_segments)()
     if first_seg == nil then
       return {}
     end
@@ -189,6 +190,7 @@ function appa.solve(A, B, C)
     B = result_list[1]
     C = result_list[2]
   end
+--  utils.write({A=A, B=B, C=C})
 
   local solutions = {} -- index of the solutions and there occurrences
   local max = {}       -- holds the n solutions having the biggest numbers of occurrences (string representations)

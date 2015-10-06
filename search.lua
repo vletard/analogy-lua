@@ -5,8 +5,8 @@ local search = {
 local params = {
   cube_seg_max_iter_without = math.huge,
   cube_seg_max_iter_with    = math.huge,
-  cube_seg_max_time_without = 8,
-  cube_seg_max_time_with    = 4,
+  cube_seg_max_time_without = 30,
+  cube_seg_max_time_with    = 30,
 --  cube_seg_max_length       = math.huge,
   cube_seg_max_triplets1    = math.huge,
   cube_seg_max_triplets2    = math.huge,
@@ -107,7 +107,7 @@ local function enumerate_valid_triplets(request)
       end
     end
   end
---  utils.table.shuffle(triplets)  -- evenly distribute the triplets in case of computation cut
+  utils.table.shuffle(triplets)  -- evenly distribute the triplets in case of computation cut
   for _, t in ipairs(triplets) do
     if not generators_end then
       generators_end = t
@@ -148,6 +148,7 @@ function search.build_cubes(request, request_txt)
       if seg then --and l <= params.cube_seg_max_length then
         if appa.count(seg[1], seg[2], seg[3], seg[4]) then
           write("[cube] latency   : "..(g.next.latency or 0).."\n")
+          g.next.triplet.latency = get_time() - global_time
           table.insert(triplets, g.next.triplet)
 --          write(utils.tostring({["#triplets"] = #triplets, time = os.time() - time, size = l, iter = iter}).."\n")
           write(segmentation.concat(seg[1], "|").." : "..segmentation.concat(seg[2], "|").." :: "..segmentation.concat(seg[3], "|").." : "..segmentation.concat(seg[4], "|").."\n")
@@ -169,6 +170,7 @@ function search.build_cubes(request, request_txt)
       iter = iter + 1
       if appa.count(seg[1], seg[2], seg[3], seg[4]) then
         write("[cube] latency   : "..(g.next.latency or 0).."\n")
+        g.next.triplet.latency = get_time() - global_time
         table.insert(triplets, g.next.triplet)
  --       write(utils.tostring({["#triplets"] = #triplets, time = os.time() - time, size = l}).."\n")
         write(segmentation.concat(seg[1], "|").." : "..segmentation.concat(seg[2], "|").." :: "..segmentation.concat(seg[3], "|").." : "..segmentation.concat(seg[4], "|").."\n")
@@ -194,7 +196,8 @@ function search.build_cubes(request, request_txt)
               x = segmentation.concat(com_x),
               y = segmentation.concat(com_y),
               z = segmentation.concat(com_z),
-              t = t
+              t = t,
+              latency = get_time() - global_time
             })
           end
         end
@@ -207,7 +210,10 @@ function search.build_cubes(request, request_txt)
       X = x,
       Y = y,
       Z = z
-    }})
+      },
+      latency = t.latency,
+      cube = true
+    })
   end
   return solutions, {}
 end
@@ -246,7 +252,7 @@ function search.build_squares(request, request_txt)
   local i = 0
   for _, pair in pairs(knowledge.pairs) do
     local only_adding, sum = no_replacement(request[1], pair.first[1])
-    if sum == 0 then
+    if not only_adding then
       for _, command in pairs(pair.second) do
 --        for seg in segmentation.enumerate_segmentations({pair.first, command, request}) do
         do 
@@ -259,15 +265,20 @@ function search.build_squares(request, request_txt)
               y = segmentation.concat(s.y, " # "),
               z = segmentation.concat(s.z, " # "),
               t = segmentation.concat(s.t, " # "),
-              final = segmentation.concat(s.t)
-              } }--[[, triple = {
+              final = segmentation.concat(s.t),
+              latency = get_time() - global_time,
+              } },--[[, triple = {
               x = segmentation.concat(pair.first),
               y = segmentation.concat(command),
               z = request_txt,
-              }]], square = true})
+              }]]
+              latency = get_time() - global_time,
+              square = true})
           end
         end
       end
+    else
+      log("[square] discarded: "..segmentation.concat(pair.first).."\n")
     end
   end
   return solutions

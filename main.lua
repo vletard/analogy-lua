@@ -95,11 +95,12 @@ search.set_log  ( true)
 --------------------------------------------------------------------------------
 
 local time_unit = 1000000000
-local function get_time()
+function get_time()
   local s, ns = os.time()
   assert(type(ns) == "number")
   return 1000000000*s + ns
 end
+global_time = get_time()
 
 local function load_files(keys, values)
   local key_file   = io.open(keys)
@@ -141,17 +142,19 @@ for request_txt in io.lines() do
   local cube   = { time = 0, nb = 0, unknown = {} }
   local time = get_time()
   local solutions = {}
+  global_time = get_time()
   local existing = knowledge.pairs[utils.tostring(request[1])]
   if existing then
     local results = {}
     for _, com in pairs(existing.second) do
       table.insert(results, segmentation.concat(com))
     end
-    table.insert(solutions, {results = results, singleton = { x = request_txt }})
+    table.insert(solutions, {results = results, singleton = { x = request_txt }, latency = get_time() - global_time })
   else
     local loc_time
     if use_squares then
       loc_time = get_time()
+      global_time = loc_time
       local squares = search.build_squares(request, request_txt)
       for _, s in ipairs(squares) do
         table.insert(solutions, s)
@@ -161,6 +164,7 @@ for request_txt in io.lines() do
     end
     if use_cubes then
       loc_time = get_time()
+      global_time = loc_time
       local cubes
       cubes, cube.unknown = search.build_cubes(request, request_txt)
       for _, s in ipairs(cubes) do
@@ -200,15 +204,18 @@ for request_txt in io.lines() do
       for _, s in ipairs(solutions) do
         local nb = 0
         print ""
+        print(string.format  ("latency_triple   %2.3f", s.latency / time_unit))
         for _, r in ipairs(s.results) do
           nb = nb + 1
+          print(string.format("latency_solution %2.3f", r.latency / time_unit))
           if s.square then
             table.insert(list, r.final)
-            print(string.format("result square%3d -> %s", #list, r.final))
+            print(string.format("result square  %4d -> %s", #list, r.final))
             print(string.format("detail triple    x = \"%s\"\ty = \"%s\"\tz = \"%s\"", r.x, r.y, r.z))
           else
+            assert(s.cube)
             table.insert(list, r.t.solution)
-            print(string.format("result cube  %3d -> %s", #list, r.t.solution))
+            print(string.format("result cube    %4d -> %s", #list, r.t.solution))
             print(string.format("detail triple O  x = \"%s\"\ty = \"%s\"\tz = \"%s\"", r.x, r.y, r.z))
           end
         end

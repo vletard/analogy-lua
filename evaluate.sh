@@ -60,7 +60,7 @@ do
         echo "An error occurred, aborting."
         exit 1
       fi
-      grep totaltime $output_file > ${output_file}_time
+      grep totaltime $output_file | cut -b 17- > ${output_file}_time
       grep final $output_file | cut -b 7- > ${output_file}_results
     done
   done
