@@ -252,7 +252,7 @@ function search.build_squares(request, request_txt)
   local i = 0
   for _, pair in pairs(knowledge.pairs) do
     local only_adding, sum = no_replacement(request[1], pair.first[1])
-    if not only_adding then
+    if sum == 0 then
       for _, command in pairs(pair.second) do
 --        for seg in segmentation.enumerate_segmentations({pair.first, command, request}) do
         do 
@@ -277,8 +277,8 @@ function search.build_squares(request, request_txt)
           end
         end
       end
-    else
-      log("[square] discarded: "..segmentation.concat(pair.first).."\n")
+--    else
+--      log("[square] discarded: "..segmentation.concat(pair.first).."\n")
     end
   end
   return solutions

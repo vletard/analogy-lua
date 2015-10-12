@@ -1,9 +1,11 @@
 local _segmentation = {
 }
 
-local mode = "words"
+local  input_mode = "words"
+local output_mode = "words"
 local modes = {
   ["words"]              = { dynamic = false, pattern = "%S+"    },
+  ["pounds"]             = { dynamic = false, pattern = "[^£]+"  },
   ["words+spaces"]       = { dynamic = false, pattern = "%S+%s*" },
   ["characters"]         = { dynamic = false, pattern = "."      },
   ["words_dynamic"]      = { dynamic =  true, pattern = "%S+"    },
@@ -13,7 +15,7 @@ local modes = {
 
 _segmentation.dynamic = false
 
-function _segmentation.set_mode(new_mode)
+local function check_mode(new_mode)
   if not modes[new_mode] then
     local mode_str = ""
     for m, _ in pairs(legal_modes) do
@@ -23,12 +25,29 @@ function _segmentation.set_mode(new_mode)
       mode_str = mode_str.."'"..m.."'"
     end
     error("Illegal mode '"..new_mode.."'. Legal modes are: "..mode_str)
+    -- return false
   end
-  mode = new_mode
+  return true
 end
 
-function _segmentation.get_mode()
-  return mode
+function _segmentation.set_input_mode(new_mode)
+  if check_mode(new_mode) then
+    input_mode = new_mode
+  end
+end
+
+function _segmentation.set_output_mode(new_mode)
+  if check_mode(new_mode) then
+    output_mode = new_mode
+  end
+end
+
+function _segmentation.get_input_mode()
+  return input_mode
+end
+
+function _segmentation.get_output_mode()
+  return output_mode
 end
 
 -- Segmenting the given character strings and returns a table of the results.
@@ -73,13 +92,12 @@ function _segmentation.chunk(mode, ...)
   end
 end
 
-function _segmentation.chunk_NL(...)
-  return _segmentation.chunk(mode, ...)
+function _segmentation.chunk_input(...)
+  return _segmentation.chunk(input_mode, ...)
 end
 
-function _segmentation.chunk_FL(...)
-  return _segmentation.chunk(mode, ...)
---  return _segmentation.chunk("words", ...)
+function _segmentation.chunk_output(...)
+  return _segmentation.chunk(output_mode, ...)
 end
 
 -- Concatenates the given list of symbols into a string
@@ -282,7 +300,7 @@ local msg_memoized = {}
 local msg_activate_memoization = false
 -- Takes a list of terminal symbols and builds the aggregation graph of them
 -- The index of the aggregated segments is returned in second position
-function make_segmentation_graph(sequence)
+local function make_segmentation_graph(sequence)
   local symbols = sequence[1]
   local space = modes[sequence.mode].pattern == "%S+" and " " or ""
 
@@ -290,6 +308,7 @@ function make_segmentation_graph(sequence)
     local tmp = msg_memoized[utils.tostring(symbols)]
     if tmp then
       assert(tmp.top, tmp.base, tmp.index)
+      tmp = utils.table.deep_copy(tmp)
       return tmp.top, tmp.base, tmp.index
     end
   end
@@ -505,7 +524,9 @@ end
 -- Enumerates the segmentations of the sequence more efficiently thanks to the list of target sequences provided
 -- The opposite sequence is optional, if provided, the returned function will output a third item for the segmented opposite
 -- max_segments specifies the maximum number of segments for sequence to be divided in
+local time = 0
 function _segmentation.enumerate_segmentations_list(sequence, list, opposite, max_segments)
+  local tmp_time = get_time()
   local space = modes[sequence.mode].pattern == "%S+" and " " or ""
   local max_segments = max_segments or math.huge
 

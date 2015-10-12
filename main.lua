@@ -10,7 +10,8 @@ segmentation = dofile "segmentation.lua"
 --------------------------------------------------------------------------------
 -- Parameters
 
-segmentation.set_mode("words")
+segmentation.set_input_mode ("words")
+segmentation.set_output_mode("pounds")
 local interactive            = false
 
 
@@ -112,15 +113,15 @@ local function load_files(keys, values)
     error "Cannot open value file."
   end
   
-  local function read(file, NLFL)
+  local function read(file, IO)
     return function ()
       local input = file:read()
-      return input and segmentation["chunk_"..NLFL](input)
+      return input and segmentation["chunk_"..IO](input)
     end
   end
 
   io.stderr:write("Loading examples and building index...\n")
-  assert(0 == knowledge.load(read(key_file, "NL"), read(value_file, "FL")))
+  assert(0 == knowledge.load(read(key_file, "input"), read(value_file, "output")))
   io.stderr:write("...done (lexicon size = "..#knowledge.lexicon..")\n")
 end
 
@@ -136,7 +137,7 @@ if interactive then
 end
 for request_txt in io.lines() do
   num_input = num_input + 1
-  request = segmentation.chunk_NL(request_txt)
+  request = segmentation.chunk_input(request_txt)
 
   local square = { time = 0, nb = 0 }
   local cube   = { time = 0, nb = 0, unknown = {} }
@@ -245,6 +246,7 @@ for request_txt in io.lines() do
       print(string.format("result not found \"%s\"", request_txt))
     end
   end
+  print(string.format("detail length    %d", #request[1]))
   print(string.format("detail totaltime %.3f", (get_time() - time) / time_unit ))
   print(string.format("final %s", #list > 0 and list[math.random(#list)] or ""))  -- TODO better choice !!!!
   print ""
