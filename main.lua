@@ -42,7 +42,7 @@ elseif arg[3] == "singletons" then
   use_squares = false
   use_cubes   = false
 else
-  io.stderr:write("Third argument is incorrect ('"..arg[1].."')\n")
+  io.stderr:write("Third argument is incorrect ('"..arg[3].."')\n")
   os.exit()
 end
 if arg[4] == "dynamic" then
