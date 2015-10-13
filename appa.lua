@@ -157,9 +157,9 @@ function appa.solve(A, B, C)
 
   -- Si A == C alors B == D
   if utils.deepcompare(A, C) then
-    return { { solution = B, occurrences = 1 } }
+    return { { solution = { x = A, y = B, z = C, t = B } , occurrences = 1 } }
   elseif utils.deepcompare(A, B) then
-    return { { solution = C, occurrences = 1 } }
+    return { { solution = { x = A, y = B, z = C, t = C }, occurrences = 1 } }
 --  elseif utils.deepcompare(B, C) then
 --    return { { solution = A, occurrences = 1 } }
   end
@@ -272,6 +272,7 @@ function appa.solve(A, B, C)
     assert(not (modif and #max == 0))
   end
   write(" "..(os.time() - time).."\n")
+  local sorted = sort(solutions)
   return sort(solutions)
 end
 

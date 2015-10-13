@@ -190,13 +190,13 @@ function search.build_cubes(request, request_txt)
         for _, com_z in pairs(z.commands) do
           local res = appa.solve(com_x, com_y, com_z)
           if #res > 0 then
-            local t = res[#res]
-            t.solution = segmentation.concat(t.solution)
+            local s = res[#res].solution
             table.insert(results, {
-              x = segmentation.concat(com_x),
-              y = segmentation.concat(com_y),
-              z = segmentation.concat(com_z),
-              t = t,
+              x = segmentation.concat(s.x, " # "),
+              y = segmentation.concat(s.y, " # "),
+              z = segmentation.concat(s.z, " # "),
+              t = segmentation.concat(s.t, " # "),
+              final = segmentation.concat(s.t),
               latency = get_time() - global_time
             })
           end
