@@ -11,7 +11,7 @@ segmentation = dofile "segmentation.lua"
 -- Parameters
 
 segmentation.set_input_mode ("words")
-segmentation.set_output_mode("pounds")
+segmentation.set_output_mode("words")
 local interactive            = false
 
 
@@ -137,6 +137,7 @@ if interactive then
 end
 for request_txt in io.lines() do
   num_input = num_input + 1
+  io.stderr:write(string.format("Requête %3d", num_input).."\b\b\b\b\b\b\b\b\b\b\b")
   request = segmentation.chunk_input(request_txt)
 
   local square = { time = 0, nb = 0 }
@@ -215,8 +216,8 @@ for request_txt in io.lines() do
             print(string.format("detail triple    x = \"%s\"\ty = \"%s\"\tz = \"%s\"", r.x, r.y, r.z))
           else
             assert(s.cube)
-            table.insert(list, r.t.solution)
-            print(string.format("result cube    %4d -> %s", #list, r.t.solution))
+            table.insert(list, r.final)
+            print(string.format("result cube    %4d -> %s", #list, r.final))
             print(string.format("detail triple O  x = \"%s\"\ty = \"%s\"\tz = \"%s\"", r.x, r.y, r.z))
           end
         end
