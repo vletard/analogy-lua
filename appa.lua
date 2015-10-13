@@ -157,9 +157,23 @@ function appa.solve(A, B, C)
 
   -- Si A == C alors B == D
   if utils.deepcompare(A, C) then
-    return { { solution = { x = A, y = B, z = C, t = B } , occurrences = 1 } }
+    local sol = {
+      x = { { segmentation.concat(A) }, mode = A.mode },
+      y = { { segmentation.concat(B) }, mode = B.mode },
+      z = { { segmentation.concat(C) }, mode = C.mode },
+    }
+    assert(sol.x[1][1] == sol.z[1][1])
+    sol.t = sol.y
+    return { { solution = sol, occurrences = 1 } }
   elseif utils.deepcompare(A, B) then
-    return { { solution = { x = A, y = B, z = C, t = C }, occurrences = 1 } }
+    local sol = {
+      x = { { segmentation.concat(A) }, mode = A.mode },
+      y = { { segmentation.concat(B) }, mode = B.mode },
+      z = { { segmentation.concat(C) }, mode = C.mode },
+    }
+    assert(sol.x[1][1] == sol.y[1][1])
+    sol.t = sol.z
+    return { { solution = sol, occurrences = 1 } }
 --  elseif utils.deepcompare(B, C) then
 --    return { { solution = A, occurrences = 1 } }
   end

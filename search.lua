@@ -13,6 +13,8 @@ local params = {
   cube_seg_max_segments     = 4,
   debug =  true,
   log   =  true,
+
+  segment_delimiter = " # ",
 }
 
 local function check_stop_params(iter, time, nb_triplets)
@@ -142,14 +144,28 @@ function search.build_cubes(request, request_txt)
   local iter      = 0
   if g then
     local discarded = 0
-    while g.next ~= g and check_stop_params(iter, time, #triplets) do
+    while g.next ~= g and check_stop_params(iter, time, #triplets) do -- Iterating over the circular linked list g
       iter = iter + 1
       local seg, l = g.next.f()
       if seg then --and l <= params.cube_seg_max_length then
         if appa.count(seg[1], seg[2], seg[3], seg[4]) then
           write("[cube] latency   : "..(g.next.latency or 0).."\n")
-          g.next.triplet.latency = get_time() - global_time
-          table.insert(triplets, g.next.triplet)
+          local triplet = {
+            x = {
+              request  = seg[1],
+              commands = g.next.triplet.x.commands,
+            },
+            y = {
+              request  = seg[2],
+              commands = g.next.triplet.y.commands,
+            },
+            z = {
+              request  = seg[3],
+              commands = g.next.triplet.z.commands,
+            },
+            latency = get_time() - global_time
+          }
+          table.insert(triplets, triplet)
 --          write(utils.tostring({["#triplets"] = #triplets, time = os.time() - time, size = l, iter = iter}).."\n")
           write(segmentation.concat(seg[1], "|").." : "..segmentation.concat(seg[2], "|").." :: "..segmentation.concat(seg[3], "|").." : "..segmentation.concat(seg[4], "|").."\n")
           g.next = g.next.next
@@ -170,8 +186,22 @@ function search.build_cubes(request, request_txt)
       iter = iter + 1
       if appa.count(seg[1], seg[2], seg[3], seg[4]) then
         write("[cube] latency   : "..(g.next.latency or 0).."\n")
-        g.next.triplet.latency = get_time() - global_time
-        table.insert(triplets, g.next.triplet)
+        local triplet = {
+          x = {
+            request  = seg[1],
+            commands = g.next.triplet.x.commands,
+          },
+          y = {
+            request  = seg[2],
+            commands = g.next.triplet.y.commands,
+          },
+          z = {
+            request  = seg[3],
+            commands = g.next.triplet.z.commands,
+          },
+          latency = get_time() - global_time
+        }
+        table.insert(triplets, triplet)
  --       write(utils.tostring({["#triplets"] = #triplets, time = os.time() - time, size = l}).."\n")
         write(segmentation.concat(seg[1], "|").." : "..segmentation.concat(seg[2], "|").." :: "..segmentation.concat(seg[3], "|").." : "..segmentation.concat(seg[4], "|").."\n")
         discarded = discarded + 1
@@ -192,10 +222,10 @@ function search.build_cubes(request, request_txt)
           if #res > 0 then
             local s = res[#res].solution
             table.insert(results, {
-              x = segmentation.concat(s.x, " # "),
-              y = segmentation.concat(s.y, " # "),
-              z = segmentation.concat(s.z, " # "),
-              t = segmentation.concat(s.t, " # "),
+              x = segmentation.concat(s.x, params.segment_delimiter),
+              y = segmentation.concat(s.y, params.segment_delimiter),
+              z = segmentation.concat(s.z, params.segment_delimiter),
+              t = segmentation.concat(s.t, params.segment_delimiter),
               final = segmentation.concat(s.t),
               latency = get_time() - global_time
             })
@@ -204,9 +234,9 @@ function search.build_cubes(request, request_txt)
       end
     end
     table.insert(solutions, {results = results, triple = {
-      x = segmentation.concat(x.request),
-      y = segmentation.concat(y.request),
-      z = segmentation.concat(z.request),
+      x = segmentation.concat(x.request, params.segment_delimiter),
+      y = segmentation.concat(y.request, params.segment_delimiter),
+      z = segmentation.concat(z.request, params.segment_delimiter),
       X = x,
       Y = y,
       Z = z
@@ -257,14 +287,15 @@ function search.build_squares(request, request_txt)
 --        for seg in segmentation.enumerate_segmentations({pair.first, command, request}) do
         do 
           local seg = {pair.first, command, request}
+--          io.stderr:write("\nAPPA IN\n"..utils.tostring({segmentation.concat(seg[1]), segmentation.concat(seg[2]), segmentation.concat(seg[3])}).."\n")
           local res = appa.solve(seg[1], seg[2], seg[3])
           if #res > 0 then
             local s = res[#res].solution
             table.insert(solutions, { results = { {
-              x = segmentation.concat(s.x, " # "),
-              y = segmentation.concat(s.y, " # "),
-              z = segmentation.concat(s.z, " # "),
-              t = segmentation.concat(s.t, " # "),
+              x = segmentation.concat(s.x, params.segment_delimiter),
+              y = segmentation.concat(s.y, params.segment_delimiter),
+              z = segmentation.concat(s.z, params.segment_delimiter),
+              t = segmentation.concat(s.t, params.segment_delimiter),
               final = segmentation.concat(s.t),
               latency = get_time() - global_time,
               } },--[[, triple = {
