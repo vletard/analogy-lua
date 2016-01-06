@@ -98,6 +98,14 @@ local function shuffle(y, z)
 end
 
 local function complement(s, x, prefix, i, j, result)
+--  utils.write {
+--    s      = segmentation.concat({s     , mode = "characters"}),
+--    x      = segmentation.concat({x     , mode = "characters"}),
+--    prefix = (not prefix or #prefix == 0) and "" or segmentation.concat({prefix, mode = "characters"}),
+--    result = (not result or #result == 0) and "" or segmentation.concat({result, mode = "characters"}),
+--    i = i,
+--    j = j,
+--  }
   prefix = prefix or {}
   i = i or 1
   j = j or 1
@@ -230,7 +238,7 @@ function appa.solve(A, B, C)
     it = it + 1
 --    write "shuffling\n"
     S = shuffle(B[1], C[1])
- --   write("shuffle('"..concat(B).."', '"..concat(C).."') ("..#B..", "..#C..") -> "..utils.table.len(S).."\n")
+--    write("shuffle('"..segmentation.concat(B).."', '"..segmentation.concat(C).."') ("..#B..", "..#C..") -> "..utils.table.len(S).."\n")
     modif = false
     for _, sw in pairs(S) do
       local s, w = sw.first, sw.second
@@ -308,7 +316,7 @@ function appa.check(x, y, z, t)
   for i=0,X do
     for j=0,Y do
       for k=0,Z do
-        for l=0,T do
+        for l=0,T do -- TODO remove the 4th loop
           if i == 0 and i == j and j == k and k == l then
             a[a.crawl(i, j, k, l)] = true
           else
@@ -322,6 +330,333 @@ function appa.check(x, y, z, t)
     end
   end
   return a[a.crawl(X, Y, Z, T)] or false
+end
+
+function appa.solve_tab(A, B, C)
+  local mode
+  -- The segmentation mode is inherited by analogy too
+  if A.mode == C.mode then
+    mode = B.mode
+  else
+    assert(A.mode == B.mode)
+    mode = C.mode
+  end
+
+  -- Si A == C alors B == D
+  if utils.deepcompare(A, C) then
+    return { { utils.table.deep_copy(B[1]), mode = mode, factors = 1 } }
+  elseif utils.deepcompare(A, B) then
+    return { { utils.table.deep_copy(C[1]), mode = mode, factors = 1 } }
+  end
+
+  -- Checking symbol counts
+  local test, segments = appa.count(A, B, C)
+  if not test then
+    return {}
+  end
+
+  x = A[1]
+  y = B[1]
+  z = C[1]
+  local X, Y, Z = #x, #y, #z
+  local a = {}
+  a.crawl = function (a, b, c)
+    return ((a * (Y+1) + b) * (Z+1)) + c
+  end
+  local default_empty = { ij = math.huge, ik = math.huge, j = math.huge, k = math.huge }
+  for i=0,X do
+    for j=0,Y do
+      for k=0,Z do
+        if Y - j + Z - k >= X - i and j + k >= i then
+          if i == 0 and i == j and j == k then
+            a[a.crawl(i, j, k)] = { ij = 1, ik = 1, j = 1, k = 1 }
+          else
+            assert(a[a.crawl(i, j, k)] == nil)
+            local S = {}
+            if i > 0 and j > 0 and x[i] == y[j] then
+              local prev = a[a.crawl(i-1, j-1, k  )] or default_empty
+              local min = math.huge
+              local path = {}
+              for _, p in ipairs { "ij", "k" } do
+                if prev[p] <= min then
+                  if prev[p] < min then
+                    path = {}
+                  end
+                  min = prev[p]
+                  table.insert(path, p)
+                end
+              end
+              for _, p in ipairs { "ik", "j" } do
+                if prev[p] + 1 <= min then
+                  if prev[p] < min then
+                    path = {}
+                  end
+                  min = prev[p] + 1
+                  table.insert(path, p)
+                end
+              end
+              S.ij      = min
+              S.ij_path = path
+            else
+              S.ij = math.huge
+            end
+            if i > 0 and k > 0 and x[i] == z[k] then
+              local prev = a[a.crawl(i-1, j  , k-1)] or default_empty
+              local min = math.huge
+              local path = {}
+              for _, p in ipairs { "ik", "j" } do
+                if prev[p] <= min then
+                  if prev[p] < min then
+                    path = {}
+                  end
+                  min = prev[p]
+                  table.insert(path, p)
+                end
+              end
+              for _, p in ipairs { "ij", "k" } do
+                if prev[p] + 1 <= min then
+                  if prev[p] < min then
+                    path = {}
+                  end
+                  min = prev[p] + 1
+                  table.insert(path, p)
+                end
+              end
+              S.ik      = min
+              S.ik_path = path
+            else
+              S.ik = math.huge
+            end
+            if j > 0 then
+              local prev = a[a.crawl(i  , j-1, k  )] or default_empty
+              local min = math.huge
+              local path = {}
+              for _, p in ipairs { "ik", "j" } do
+                if prev[p] <= min then
+                  if prev[p] < min then
+                    path = {}
+                  end
+                  min = prev[p]
+                  table.insert(path, p)
+                end
+              end
+              for _, p in ipairs { "ij", "k" } do
+                if prev[p] + 1 <= min then
+                  if prev[p] < min then
+                    path = {}
+                  end
+                  min = prev[p] + 1
+                  table.insert(path, p)
+                end
+              end
+              S.j      = min
+              S.j_path = path
+            else
+              S.j = math.huge
+            end
+            if k > 0 then
+              local prev = a[a.crawl(i  , j  , k-1)] or default_empty
+              local min = math.huge
+              local path = {}
+              for _, p in ipairs { "ij", "k" } do
+                if prev[p] <= min then
+                  if prev[p] < min then
+                    path = {}
+                  end
+                  min = prev[p]
+                  table.insert(path, p)
+                end
+              end
+              for _, p in ipairs { "ik", "j" } do
+                if prev[p] + 1 <= min then
+                  if prev[p] < min then
+                    path = {}
+                  end
+                  min = prev[p] + 1
+                  table.insert(path, p)
+                end
+              end
+              S.k      = min
+              S.k_path = path
+            else
+              S.k = math.huge
+            end
+            a[a.crawl(i, j, k)] = S
+          end
+        end
+      end
+    end
+  end
+  local solution = {}
+  local factors
+  do
+    local i, j, k = X, Y, Z
+    local path
+    while i > 0 or j > 0 or k > 0 do
+      local cell = a[a.crawl(i, j, k)]
+      local min = "ij"
+      if i == X and j == Y and k == Z then
+        if cell.ik < cell[min] then
+          min = "ik"
+        end
+        if cell.j  < cell[min] then
+          min = "j"
+        end
+        if cell.k  < cell[min] then
+          min = "k"
+        end
+        factors = cell[min]
+        if factors == math.huge then
+          return {}
+        end
+      else
+        min = path
+      end
+      path = cell[min.."_path"][1]
+      if min == "j" then
+        solution[j+k-i] = y[j]
+        j = j-1
+      elseif min == "k" then
+        solution[j+k-i] = z[k]
+        k = k-1
+      elseif min == "ij" then
+        i, j = i-1, j-1
+      elseif min == "ik" then
+        i, k = i-1, k-1
+      end
+    end
+  end
+  return { { solution, mode = mode, factors = factors } }
+end
+
+function appa.solve_tree(x, y, z)
+  local function sort_f(node1, node2)
+    return node1.value > node2.value
+  end
+  local X, Y, Z = #x, #y, #z
+  local node_list = { {
+    segments = 0,
+    value = 0,
+    i = 0,
+    j = 0,
+    k = 0,
+  } }
+  local mem = {}
+  while node_list[1] and node_list[1].i + node_list[1].j + node_list[1].k < X + Y + Z do
+    local node = node_list[1]
+    if node.j < Y then
+      local new_node = {
+        segments = node.segments + 1,
+        i = node.i,
+        j = node.j + 1,
+        k = node.k,
+        output = { segment = y[node.j + 1], prev = node.output }
+      }
+      new_node.value = (new_node.i + new_node.j + new_node.k) / new_node.segments
+      if new_node.value > 1 then
+        table.insert(node_list, new_node)
+      end
+    end
+    if node.k < Z then
+      local new_node = {
+        segments = node.segments + 1,
+        i = node.i,
+        j = node.j,
+        k = node.k + 1,
+        output = { segment = z[node.k + 1], prev = node.output }
+      }
+      new_node.value = (new_node.i + new_node.j + new_node.k) / new_node.segments
+      if new_node.value > 1 then
+        table.insert(node_list, new_node)
+      end
+    end
+    if node.i < X and node.j < Y and x[node.i + 1] == y[node.j + 1] then
+      local new_node = {
+        segments = node.segments + 1,
+        i = node.i + 1,
+        j = node.j + 1,
+        k = node.k,
+        output = { segment = nil, prev = node.output }
+      }
+      new_node.value = (new_node.i + new_node.j + new_node.k) / new_node.segments
+      table.insert(node_list, new_node)
+      if node.k < Z then
+        local new_node = {
+          segments = node.segments + 1,
+          i = node.i + 1,
+          j = node.j + 1,
+          k = node.k + 1,
+          output = { segment = z[node.k + 1], prev = node.output }
+        }
+        new_node.value = (new_node.i + new_node.j + new_node.k) / new_node.segments
+        table.insert(node_list, new_node)
+      end
+    end
+    if node.i < X and node.k < Z and x[node.i + 1] == z[node.k + 1] then
+      local new_node = {
+        segments = node.segments + 1,
+        i = node.i + 1,
+        j = node.j,
+        k = node.k + 1,
+        output = { segment = nil, prev = node.output }
+      }
+      new_node.value = (new_node.i + new_node.j + new_node.k) / new_node.segments
+      table.insert(node_list, new_node)
+      if node.k < Y then
+        local new_node = {
+          segments = node.segments + 1,
+          i = node.i + 1,
+          j = node.j + 1,
+          k = node.k + 1,
+          output = { segment = y[node.j + 1], prev = node.output }
+        }
+        new_node.value = (new_node.i + new_node.j + new_node.k) / new_node.segments
+        table.insert(node_list, new_node)
+      end
+    end
+    node_list[1] = node_list[#node_list]
+    node_list[#node_list] = nil
+    table.sort(node_list, sort_f)
+    do
+      local node = node_list[1]
+      if node then
+        local str = ""
+        local utt = node.output
+        while utt do
+          str = str..(utt.segment or "_")
+          utt = utt.prev
+        end
+        str = string.reverse(str)
+        -- utils.write {
+        --   i = node.i, j = node.j, k = node.k,
+        --   output = str,
+        --   segments = node.segments,
+        --   value = node.value,
+        -- }
+        -- print ""
+        io.stderr:write("\r"..str.."                                                      ")
+        -- assert(not mem[str])
+        -- mem[str] = true
+      end
+    end
+  end
+  if node_list[1] then
+    local inv_res, res = {}, {}
+    local out = node_list[1].output
+    while out do
+      if out.segment then
+        table.insert(inv_res, out.segment)
+      end
+      out = out.prev
+    end
+    for i, e in ipairs(inv_res) do
+      res[#inv_res - i + 1] = e
+    end
+    return res
+  else
+    return {}
+  end
+
 end
 
 return appa

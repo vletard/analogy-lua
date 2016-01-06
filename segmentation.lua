@@ -526,7 +526,7 @@ end
 -- max_segments specifies the maximum number of segments for sequence to be divided in
 local time = 0
 function _segmentation.enumerate_segmentations_list(sequence, list, opposite, max_segments)
-  local tmp_time = get_time()
+  local tmp_time = utils.time()
   local space = modes[sequence.mode].pattern == "%S+" and " " or ""
   local max_segments = max_segments or math.huge
 
