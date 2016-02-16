@@ -8,6 +8,70 @@ local knowledge = {
   tree_count = nil,
 }
 
+local function cmp_multitype(op1, op2)
+    local type1, type2 = type(op1), type(op2)
+    if type1 ~= type2 then --cmp by type
+        return type1 < type2
+    elseif type1 == "number" and type2 == "number"
+        or type1 == "string" and type2 == "string" then
+        return op1 < op2 --comp by default
+    elseif type1 == "boolean" and type2 == "boolean" then
+        return op1 == true
+    else
+        return tostring(op1) < tostring(op2) --cmp by address
+    end
+end
+
+local function pairs(t)
+  assert(type(t) == "table")
+  local meta = getmetatable(t) or {}
+  local keys, index
+  if not meta.__factoriel__meta__ then
+    keys = {}
+    local k = next(t)
+    while k do
+      table.insert(keys, k)
+      k = next(t, k)
+    end
+    table.sort(keys, cmp_multitype)
+    index = {}
+    for i, k in ipairs(keys) do
+      assert(not index[k])
+      index[k] = i
+    end
+    meta.__factoriel__meta__ = {
+      keys = keys,
+      index = index
+    }
+    local tmp = meta.__newindex or rawset
+    meta.__newindex = function (t, k, v)
+      getmetatable(t).__factoriel__meta__ = nil
+      tmp(t, k, v)
+    end
+  else
+    keys  = meta.__factoriel__meta__.keys
+    index = meta.__factoriel__meta__.index
+  end
+  return function (t2, k)
+    if t2 == nil then
+      t2 = t
+    end
+    if not t2 == t then
+      utils.write{t2 = t2, t = t}
+      assert(false)
+    end
+    local rk, rv = nil, nil
+    if k == nil then
+      rk = keys[1]
+      rv = t2[rk]
+    else
+      rk = keys[index[k]+1]
+      rv = t2[rk]
+    end
+    assert(rv or not rk)
+    return rk, rv
+  end
+end
 
 --------------------------------------------------------------------------------
 -- Implementation of tree-count (Langlais & Yvon, 2008)
@@ -46,6 +110,10 @@ function tc.insert(counts, ic, current, parent, alphabet)
   elseif current.index == ic then
     local n = tc.node()
     assert(not current.children[count])
+--    if count == 0 then -- XXX new
+--      n.forms = current.forms
+--      current.forms = {}
+--    end
     current.children[count] = n
     parent = current
     current = n
@@ -56,9 +124,7 @@ function tc.insert(counts, ic, current, parent, alphabet)
       n1.children[0] = current
       local n2 = tc.node()
       n1.children[count] = n2
-      if parent == nil then
-        parent = n1
-      else
+      if parent then
         for i, c in pairs(parent.children) do
           if c == current then
             parent.children[i] = n1
@@ -66,9 +132,12 @@ function tc.insert(counts, ic, current, parent, alphabet)
           end
         end
       end
+      parent = n1
       current = n2
     end
   end
+--  assert(not (current.children[0] and #current.forms > 0))
+--  assert(not (parent.children[0] and #parent.forms > 0))
   return current, parent
 end
 
@@ -106,6 +175,7 @@ function tc.build(alphabet, forms)
   local tree = tc.node(0, nil, { [0] = tc.node() })
   local A = #alphabet
   for _, pair in pairs(forms) do
+--    print("debug "..segmentation.concat(pair.first))
     local f = pair.first[1]
     local counts = tc.encode(f)
     local current, parent, i = tc.search(counts, tree, alphabet)
@@ -114,12 +184,13 @@ function tc.build(alphabet, forms)
       i = i + 1
     end
     table.insert(current.forms, pair.first)
+--    print("debug "..#current.forms)
   end
   return tree
 end
 
 function tc.retrieve(tree, counts)
-  local frontier = {[knowledge.tree_count] = knowledge.tree_count}
+  local frontier = { { knowledge.tree_count, knowledge.tree_count } }
   local A = #knowledge.lexicon
   local i = 0
   for w, _ in pairs(counts) do
@@ -128,41 +199,75 @@ function tc.retrieve(tree, counts)
                 -- Note that if the check is performed sooner (more optimal) this case should never occur
     end
   end
+  local end_search = 0
+--  for n = 0, A do
+--    if (counts[knowledge.lexicon[n]] or 0) > 0 then
+--      end_search = n
+--    end
+--  end
+--    print(utils.tostring_inline(counts))
+--    local validated = {}
   while i <= A and utils.table.len(frontier) ~= 0 do
     local res = {}
-    local count = counts[knowledge.lexicon[i]] or 0
-    for p1, p2 in pairs(frontier) do
+    local token = knowledge.lexicon[i]
+--    print(utils.tostring_inline(counts))
+    local count = counts[token] or 0
+--    print("count["..(token or "nil").."] = "..count)
+    for _, p in ipairs(frontier) do
+      local p1 = p[1]
+      local p2 = p[2]
+--      assert(not (p1.children[0] and #p1.forms > 0))
+--      assert(not (p2.children[0] and #p2.forms > 0))
       if p1.index == p2.index and p1.index == i then
         for count1, child1 in pairs(p1.children) do
           for count2, child2 in pairs(p2.children) do
             if count1 + count2 == count then
-              assert(not res[child1])
-              res[child1] = child2
+              table.insert(res, { child1, child2 })
             end
+          end
+        end
+        if count > 0 then -- XXX new
+          local child1 = p1.children[count]
+          local child2 = p2.children[count]
+          if child1 and #p2.forms > 0 then
+            table.insert(res, { child1, p2 })
+          end
+          if child2 and #p1.forms > 0 then
+            table.insert(res, { p1, child2 })
           end
         end
       elseif p1.index == i then
         local s = p1.children[count]
+        if count == 0 then -- XXX new
+          s = s or p1
+        end
         if s then
-          assert(not res[s])
-          res[s] = p2
+          table.insert(res, { s, p2 })
         end
       elseif p2.index == i then
         local s = p2.children[count]
+        if count == 0 then -- XXX new
+          s = s or p2
+        end
         if s then
-          assert(not res[p1])
-          res[p1] = s
+          table.insert(res, { p1, s })
         end
       elseif count == 0 then
-        assert(not res[p1])
-        res[p1] = p2
+        table.insert(res, { p1, p2 })
       end
     end
     frontier = res
+--    print(string.format("debug token '%s' validé %d fois sur %d", knowledge.lexicon[i], utils.table.len(frontier), count))
+--    table.insert(validated, { knowledge.lexicon[i], utils.table.len(frontier), count })
+--    validated[(knowledge.lexicon[i] or "nil")] = count
+--    print("tokens validés : "..utils.tostring_inline(validated))
+--    print("tokens attendus: "..utils.tostring_inline(counts))
     i = i + 1
   end
   local forms = {}
-  for p1, p2 in pairs(frontier) do
+  for _, p in ipairs(frontier) do
+    local p1 = p[1]
+    local p2 = p[2]
     for _, f1 in ipairs(p1.forms) do
       for _, f2 in ipairs(p2.forms) do
         assert(utils.deepcompare(tc.encode(f1[1], f2[1]), counts))
@@ -187,7 +292,10 @@ function knowledge.list_unknown(request)
 end
 
 function knowledge.retrieve(request, match)
-  return tc.retrieve(knowledge.tree_count, tc.encode(request[1], match[1]))
+  local counts = tc.encode(request[1], match[1])
+  local res = tc.retrieve(knowledge.tree_count, counts)
+--  print("debug "..segmentation.concat(match))
+  return res
 end
 
 -- Loads the pairs in input
@@ -196,6 +304,7 @@ end
 function knowledge.load(keys, values)
   local k, v = keys(), values()
   local histo = {}
+  local histoindex = {}
   while k do
     if not v then
       return 1
@@ -243,6 +352,9 @@ function knowledge.load(keys, values)
     return -1
   else
     knowledge.tree_count = tc.build(knowledge.lexicon, knowledge.pairs)
+    local fd = io.open("/tmp/knowledge", "w")
+    fd:write(utils.tostring(knowledge.tree_count))
+    fd:close()
     return 0
   end
 end

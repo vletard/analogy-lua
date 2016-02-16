@@ -300,6 +300,9 @@ end
 
 function appa.check(x, y, z, t)
   local X, Y, Z, T = #x, #y, #z, #t
+  if X + T ~= Z + Y then
+    return false
+  end
   local a = {}
   a.crawl = function (a, b, c, d)
     return (((a * (Y+1) + b) * (Z+1)) + c) * (T+1) + d
@@ -332,6 +335,60 @@ function appa.check(x, y, z, t)
   return a[a.crawl(X, Y, Z, T)] or false
 end
 
+function appa.check_n3(x, y, z, t)
+  local X, Y, Z, T = #x, #y, #z, #t
+  if X + T ~= Z + Y then
+    return false
+  end
+  local a = {}
+  a.crawl = function (a, b, c)
+    return (a * (Y+1) + b) * (Z+1) + c
+  end
+  for i=0,X do
+    for j=0,Y do
+      for k=0,Z do
+        if i == 0 and j == 0 and k == 0 then
+          a[a.crawl(i, j, k)] = 0
+        else
+          utils.write{i=i, j=j, k=k, x, y, z, t}
+          local l = nil
+          if x[i] == y[j] then
+            local ll = a[a.crawl(i-1, j-1, k  )]
+            if ll then print "ij" end
+            assert(ll == (l or ll))
+            l = ll
+          end
+          if x[i] == z[k] then
+            local ll = a[a.crawl(i-1, j  , k-1)]
+            if ll then print "ik" end
+            assert(ll == (l or ll))
+            l = ll
+          end
+          do
+            local ll = a[a.crawl(i  , j-1, k  )]
+            if ll and ll < T and t[ll+1] == y[j] then
+              print("jl",y[j],t[ll+1])
+              assert(ll+1 == (l or (ll+1)))
+              l = ll+1
+            end
+          end
+          do
+            local ll = a[a.crawl(i  , j  , k-1)]
+            if ll and ll < T and t[ll+1] == z[k] then
+              print("kl", z[k], t[ll+1], k, ll+1)
+              assert(ll+1 == (l or (ll+1)))
+              l = ll+1
+            end
+          end
+          a[a.crawl(i, j, k)] = l
+        end
+      end
+    end
+  end
+  return a[a.crawl(X, Y, Z)] == T
+end
+
+
 function appa.solve_tab(A, B, C)
   local mode
   -- The segmentation mode is inherited by analogy too
@@ -344,9 +401,29 @@ function appa.solve_tab(A, B, C)
 
   -- Si A == C alors B == D
   if utils.deepcompare(A, C) then
-    return { { utils.table.deep_copy(B[1]), mode = mode, factors = 1 } }
+    return {
+      {
+        solution = {
+          x = A,
+          y = B,
+          z = C,
+          t = utils.table.deep_copy(B)
+        },
+        factors = 1
+      }
+    }
   elseif utils.deepcompare(A, B) then
-    return { { utils.table.deep_copy(C[1]), mode = mode, factors = 1 } }
+    return {
+      {
+        solution = {
+          x = A,
+          y = B,
+          z = C,
+          t = utils.table.deep_copy(C)
+        },
+        factors = 1
+      }
+    }
   end
 
   -- Checking symbol counts
@@ -526,7 +603,20 @@ function appa.solve_tab(A, B, C)
       end
     end
   end
-  return { { solution, mode = mode, factors = factors } }
+  return {
+    {
+      solution = {
+        x = A,
+        y = B,
+        z = C,
+        t = {
+          solution,
+          mode = mode
+        },
+      },
+      factors = factors
+    }
+  }
 end
 
 function appa.solve_tree(x, y, z)

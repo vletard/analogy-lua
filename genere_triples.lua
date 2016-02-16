@@ -1,39 +1,51 @@
 #!/usr/bin/env lua
 
-dofile "/people/letard/local/lib/lua/toolbox.lua"
-dofile "knowledge.lua"
-dofile "appa.lua"
-dofile "io.lua"
+utils        = dofile "/people/letard/local/lib/lua/toolbox.lua"
+knowledge    = dofile "knowledge.lua"
+appa         = dofile "appa.lua"
+segmentation = dofile "segmentation.lua"
 
+segmentation.set_input_mode ("characters")
+segmentation.set_output_mode("words")
 
---------------------------------------------------------------------------------
--- Paramètres 
-
-analog_io.chunk_pattern =
--- "%S+%s*"  -- words including spaces
-   "%S+"     -- words
--- "."       -- characters
-
--- local use_squares            =  true
--- local use_cubes              =  true
-local   key_file = 
-   "../case_base/2015_05_bash/train/01.in.txt"
--- "../case_base/2014_01_R/train/01.in.txt"
--- "../case_base/perso/in.txt"
-
-local value_file = 
-   "../case_base/2015_05_bash/train/01.out.txt"
--- "../case_base/2014_01_R/train/01.out.txt"
--- "../case_base/perso/out.txt"
+if #arg < 2 then
+  io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE")
+  os.exit()
+end
+key_file   = arg[1]
+value_file = arg[2]
 
 --------------------------------------------------------------------------------
 
 function info(arg)
   write(arg)
 end
+appa  .set_debug(false)
+
+local function load_files(keys, values)
+  local key_file   = io.open(keys)
+  local value_file = io.open(values)
+
+  if not key_file then
+    error "Cannot open key file."
+  elseif not value_file then
+    error "Cannot open value file."
+  end
+  
+  local function read(file, IO)
+    return function ()
+      local input = file:read()
+      return input and segmentation["chunk_"..IO](input)
+    end
+  end
+
+  io.stderr:write("Loading examples and building index...\n")
+  assert(0 == knowledge.load(read(key_file, "input"), read(value_file, "output")))
+  io.stderr:write("...done (lexicon size = "..#knowledge.lexicon..")\n")
+end
 
 
-analog_io.load(key_file, value_file)
+load_files(key_file, value_file)
 
 local function fact(n)
   assert(n >= 0)
@@ -56,7 +68,7 @@ for _, command in pairs(knowledge.commands) do
       if _b ~= _a then
         for _c, c in pairs(command.second) do
           if _c ~= _b and _c ~= _a then
-            info(analog_io.concat(a).."\t"..analog_io.concat(b).."\t"..analog_io.concat(c))
+            info(segmentation.concat(a).."\t"..segmentation.concat(b).."\t"..segmentation.concat(c))
             table.insert(triples, {a, b, c})
             -- local results = appa.solve(a, b, c)
             -- if #results > 0 then

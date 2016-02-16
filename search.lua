@@ -14,9 +14,10 @@ local params = {
   debug =  true,
   log   =  true,
 
-  segment_delimiter = " # ",
+  segment_delimiter = nil -- " # ",
 }
 
+-- Return false if the stop parameters have been reached, true if not
 local function check_stop_params(iter, time, nb_triplets)
   if not segmentation.dynamic_cube and not search.static_cut then
     return true
@@ -64,6 +65,7 @@ search.set_debug(params.debug)
 local function enumerate_valid_triplets(request)
   local generators_start, generators_end
   local triplets = {}
+
   for _, pair in pairs(knowledge.pairs) do
     if #triplets >= params.cube_seg_max_triplets1 then
       break
@@ -218,7 +220,7 @@ function search.build_cubes(request, request_txt)
     for _, com_x in pairs(x.commands) do
       for _, com_y in pairs(y.commands) do
         for _, com_z in pairs(z.commands) do
-          local res = appa.solve(com_x, com_y, com_z)
+          local res = appa.solve_tab(com_x, com_y, com_z)
           if #res > 0 then
             local s = res[#res].solution
             table.insert(results, {
@@ -233,17 +235,19 @@ function search.build_cubes(request, request_txt)
         end
       end
     end
-    table.insert(solutions, {results = results, triple = {
-      x = segmentation.concat(x.request, params.segment_delimiter),
-      y = segmentation.concat(y.request, params.segment_delimiter),
-      z = segmentation.concat(z.request, params.segment_delimiter),
-      X = x,
-      Y = y,
-      Z = z
-      },
-      latency = t.latency,
-      cube = true
-    })
+    if #results > 0 then
+      table.insert(solutions, {results = results, triple = {
+        x = segmentation.concat(x.request, params.segment_delimiter),
+        y = segmentation.concat(y.request, params.segment_delimiter),
+        z = segmentation.concat(z.request, params.segment_delimiter),
+        X = x,
+        Y = y,
+        Z = z
+        },
+        latency = t.latency,
+        cube = true
+      })
+    end
   end
   return solutions, {}
 end
@@ -288,7 +292,7 @@ function search.build_squares(request, request_txt)
         do 
           local seg = {pair.first, command, request}
 --          io.stderr:write("\nAPPA IN\n"..utils.tostring({segmentation.concat(seg[1]), segmentation.concat(seg[2]), segmentation.concat(seg[3])}).."\n")
-          local res = appa.solve(seg[1], seg[2], seg[3])
+          local res = appa.solve_tab(seg[1], seg[2], seg[3])
           if #res > 0 then
             local s = res[#res].solution
             table.insert(solutions, { results = { {

@@ -1,4 +1,4 @@
-#!/people/letard/local/bin/lua
+#!/usr/bin/env lua
 
 dofile "/people/letard/local/lib/lua/toolbox.lua"
 knowledge    = dofile "knowledge.lua"
@@ -12,7 +12,8 @@ segmentation = dofile "segmentation.lua"
 
 segmentation.set_input_mode ("words")
 segmentation.set_output_mode("words")
-local interactive            = false
+local interactive     = false
+local full_resolution = true   -- assign false for optimized execution
 
 
 -- End parameters
@@ -58,6 +59,19 @@ elseif arg[4] ~= "static" then
   io.stderr:write("Fourth argument is incorrect ('"..arg[1].."').\n")
   os.exit()
 end
+local input_request = arg[5]
+local function lines()
+  local tmp = input_request
+  return function()
+    local tmp2 = tmp
+    if input_request then
+      tmp = nil
+      return tmp2
+    else
+      return io.stdin:read()
+    end
+  end
+end
 
 -- local   key_file = 
 --  "../case_base/2015_05_bash/train/01_l.in.txt" -- case_base 01
@@ -90,6 +104,7 @@ local function info(arg)
 end
 appa  .set_debug(false)
 search.set_debug(false)
+main_log = false
 
 search.set_log  ( true)
 
@@ -120,9 +135,13 @@ local function load_files(keys, values)
     end
   end
 
-  io.stderr:write("Loading examples and building index...\n")
+  if main_log then
+    io.stderr:write("Loading examples and building index...\n")
+  end
   assert(0 == knowledge.load(read(key_file, "input"), read(value_file, "output")))
-  io.stderr:write("...done (lexicon size = "..#knowledge.lexicon..")\n")
+  if main_log then
+    io.stderr:write("...done (lexicon size = "..#knowledge.lexicon..")\n")
+  end
 end
 
 
@@ -135,9 +154,11 @@ local num_input = 0
 if interactive then
   io.stderr:write "requête : "
 end
-for request_txt in io.lines() do
+for request_txt in lines() do
   num_input = num_input + 1
-  io.stderr:write(string.format("Requête %3d", num_input).."\b\b\b\b\b\b\b\b\b\b\b")
+  if main_log then
+    io.stderr:write(string.format("Requête %3d", num_input).."\b\b\b\b\b\b\b\b\b\b\b")
+  end
   request = segmentation.chunk_input(request_txt)
 
   local square = { time = 0, nb = 0 }
@@ -152,7 +173,8 @@ for request_txt in io.lines() do
       table.insert(results, segmentation.concat(com))
     end
     table.insert(solutions, {results = results, singleton = { x = request_txt }, latency = get_time() - global_time })
-  else
+  end
+  if not existing or full_resolution then
     local loc_time
     if use_squares then
       loc_time = get_time()
@@ -178,6 +200,7 @@ for request_txt in io.lines() do
   end
 
   local list = {}
+  local singletons = {}
   ------------------------------------------------------------------------
   -- Logging
   ------------------------------------------------------------------------
@@ -195,35 +218,38 @@ for request_txt in io.lines() do
   if not interactive then
     print("input #"..num_input.." -> \""..request_txt.."\"")
   end
+
   if #solutions > 0 then
-    if solutions[1].singleton then
-      assert(#solutions == 1)
-      table.insert(list, solutions[1].results[1])
-      print(string.format("result single%3d \"%s\" -> %s", #list, request_txt, solutions[1].results[1]))
-    else
-      print(string.format("detail square    time = %.3f   results = %3d          ", square.time / time_unit, square.nb))
-      print(string.format("detail cube      time = %.3f   results = %3d          ", cube.time / time_unit, cube.nb))
-      for _, s in ipairs(solutions) do
-        local nb = 0
+    print(string.format("detail square    time = %.3f   results = %3d          ", square.time / time_unit, square.nb))
+    print(string.format("detail cube      time = %.3f   results = %3d          ", cube.time / time_unit, cube.nb))
+    for _, s in ipairs(solutions) do
+      if s.singleton then
+        table.insert(list, solutions[1].results[1])
+        table.insert(singletons, solutions[1].results[1])
+        print(string.format("result single    %6d -> %s", #list, solutions[1].results[1]))
+        print(string.format("detail singleton %s", request_txt))
+      else
         print ""
         print(string.format  ("latency_triple   %2.3f", s.latency / time_unit))
-        for _, r in ipairs(s.results) do
-          nb = nb + 1
-          print(string.format("latency_solution %2.3f", r.latency / time_unit))
-          if s.square then
+        if s.square then
+          for _, r in ipairs(s.results) do
             table.insert(list, r.final)
-            print(string.format("result square  %4d -> %s", #list, r.final))
-            print(string.format("detail triple    x = \"%s\"\ty = \"%s\"\tz = \"%s\"", r.x, r.y, r.z))
-          else
-            assert(s.cube)
-            table.insert(list, r.final)
-            print(string.format("result cube    %4d -> %s", #list, r.final))
-            print(string.format("detail triple O  x = \"%s\"\ty = \"%s\"\tz = \"%s\"", r.x, r.y, r.z))
+            print(string.format("latency_solution %2.3f", r.latency / time_unit))
+            print(string.format("result square    %6d -> %s", #list, r.final))
+            print(string.format("detail triple    %s\t%s\t%s", r.x, r.y, r.z))
           end
-        end
-        if not s.square then
+        else
+          assert(s.cube)
+          for _, r in ipairs(s.results) do
+            table.insert(list, r.final)
+            print(string.format("latency_solution %2.3f", r.latency / time_unit))
+            print(string.format("result cube      %6d -> %s", #list, r.final))
+            print(string.format("detail triple O  %s\t%s\t%s", r.x, r.y, r.z))
+          end
+
+          assert(#s.results > 0)
 --          print(string.format("result cube1     \"%s\"", request_txt))
-          print(string.format("detail triple I  x = \"%s\"\ty = \"%s\"\tz = \"%s\"",
+          print(string.format(  "detail triple I  %s\t%s\t%s",
             s.triple.x,
             s.triple.y,
             s.triple.z
@@ -249,7 +275,7 @@ for request_txt in io.lines() do
   end
   print(string.format("detail length    %d", #request[1]))
   print(string.format("detail totaltime %.3f", (get_time() - time) / time_unit ))
-  print(string.format("final %s", #list > 0 and list[math.random(#list)] or ""))  -- TODO better choice !!!!
+  print(string.format("final %s", (#singletons > 0 and singletons[1]) or (#list > 0 and list[math.random(#list)]) or ""))  -- TODO better choice !!!!
   print ""
 
   if interactive then
