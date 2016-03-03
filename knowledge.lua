@@ -101,7 +101,7 @@ function tc.insert(counts, ic, current, parent, alphabet)
   if current.index == nil then
     if count ~= 0 then
       current.index = ic
-      current.label = alphabet[ic]
+      current.label = alphabet[ic] -- XXX est-ce nécessaire ? si non, supprimer
       local n = tc.node()
       current.children[count] = n
       parent = current
@@ -199,20 +199,10 @@ function tc.retrieve(tree, counts)
                 -- Note that if the check is performed sooner (more optimal) this case should never occur
     end
   end
-  local end_search = 0
---  for n = 0, A do
---    if (counts[knowledge.lexicon[n]] or 0) > 0 then
---      end_search = n
---    end
---  end
---    print(utils.tostring_inline(counts))
---    local validated = {}
   while i <= A and utils.table.len(frontier) ~= 0 do
     local res = {}
     local token = knowledge.lexicon[i]
---    print(utils.tostring_inline(counts))
     local count = counts[token] or 0
---    print("count["..(token or "nil").."] = "..count)
     for _, p in ipairs(frontier) do
       local p1 = p[1]
       local p2 = p[2]
@@ -257,11 +247,6 @@ function tc.retrieve(tree, counts)
       end
     end
     frontier = res
---    print(string.format("debug token '%s' validé %d fois sur %d", knowledge.lexicon[i], utils.table.len(frontier), count))
---    table.insert(validated, { knowledge.lexicon[i], utils.table.len(frontier), count })
---    validated[(knowledge.lexicon[i] or "nil")] = count
---    print("tokens validés : "..utils.tostring_inline(validated))
---    print("tokens attendus: "..utils.tostring_inline(counts))
     i = i + 1
   end
   local forms = {}
