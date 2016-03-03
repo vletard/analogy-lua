@@ -298,7 +298,7 @@ function appa.solve(A, B, C)
   return sort(solutions)
 end
 
-function appa.check(x, y, z, t)
+function appa.check_n4(x, y, z, t)
   local X, Y, Z, T = #x, #y, #z, #t
   if X + T ~= Z + Y then
     return false
@@ -335,6 +335,12 @@ function appa.check(x, y, z, t)
   return a[a.crawl(X, Y, Z, T)] or false
 end
 
+function appa.check(x, y, z, t)
+  local n3 = appa.check_n3(x, y, z, t)
+  assert(n3 == appa.check_n4(x, y, z, t))
+  return n3
+end
+
 function appa.check_n3(x, y, z, t)
   local X, Y, Z, T = #x, #y, #z, #t
   if X + T ~= Z + Y then
@@ -350,24 +356,20 @@ function appa.check_n3(x, y, z, t)
         if i == 0 and j == 0 and k == 0 then
           a[a.crawl(i, j, k)] = 0
         else
-          utils.write{i=i, j=j, k=k, x, y, z, t}
           local l = nil
           if x[i] == y[j] then
             local ll = a[a.crawl(i-1, j-1, k  )]
-            if ll then print "ij" end
             assert(ll == (l or ll))
             l = ll
           end
           if x[i] == z[k] then
             local ll = a[a.crawl(i-1, j  , k-1)]
-            if ll then print "ik" end
             assert(ll == (l or ll))
             l = ll
           end
           do
             local ll = a[a.crawl(i  , j-1, k  )]
             if ll and ll < T and t[ll+1] == y[j] then
-              print("jl",y[j],t[ll+1])
               assert(ll+1 == (l or (ll+1)))
               l = ll+1
             end
@@ -375,7 +377,6 @@ function appa.check_n3(x, y, z, t)
           do
             local ll = a[a.crawl(i  , j  , k-1)]
             if ll and ll < T and t[ll+1] == z[k] then
-              print("kl", z[k], t[ll+1], k, ll+1)
               assert(ll+1 == (l or (ll+1)))
               l = ll+1
             end
