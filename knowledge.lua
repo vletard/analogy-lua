@@ -22,6 +22,8 @@ local function cmp_multitype(op1, op2)
     end
 end
 
+-- This overriding of pairs is necessary in order to constistently
+-- enumerate tables in the same order
 local function pairs(t)
   assert(type(t) == "table")
   local meta = getmetatable(t) or {}
@@ -216,31 +218,29 @@ function tc.retrieve(tree, counts)
             end
           end
         end
-        if count > 0 then -- XXX new
-          local child1 = p1.children[count]
-          local child2 = p2.children[count]
-          if child1 and #p2.forms > 0 then
-            table.insert(res, { child1, p2 })
-          end
-          if child2 and #p1.forms > 0 then
-            table.insert(res, { p1, child2 })
-          end
+        local child1 = p1.children[count] -- XXX new
+        local child2 = p2.children[count]
+        if child1 and #p2.forms > 0 then
+          table.insert(res, { child1, p2 })
+        end
+        if child2 and #p1.forms > 0 then
+          table.insert(res, { p1, child2 })
         end
       elseif p1.index == i then
         local s = p1.children[count]
-        if count == 0 then -- XXX new
-          s = s or p1
-        end
         if s then
           table.insert(res, { s, p2 })
         end
+        if count == 0 and #p1.forms > 0 then -- XXX new
+          table.insert(res, { p1, p2 })
+        end
       elseif p2.index == i then
         local s = p2.children[count]
-        if count == 0 then -- XXX new
-          s = s or p2
-        end
         if s then
           table.insert(res, { p1, s })
+        end
+        if count == 0 and #p2.forms > 0 then -- XXX new
+          table.insert(res, { p1, p2 })
         end
       elseif count == 0 then
         table.insert(res, { p1, p2 })
