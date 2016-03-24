@@ -65,17 +65,38 @@ search.set_debug(params.debug)
 local function enumerate_valid_triplets(request)
   local generators_start, generators_end
   local triplets = {}
+  local triplets_dev = {}
 
   for _, pair in pairs(knowledge.pairs) do
     if #triplets >= params.cube_seg_max_triplets1 then
       break
     end
-    local res = knowledge.retrieve(request, pair.first)
+    local res = knowledge.retrieve(request, pair.first, 1)
     for _, res_pair in ipairs(res) do
       if #triplets >= params.cube_seg_max_triplets1 then
         break
       end
-      if appa.count(pair.first, res_pair.first, res_pair.second, request) then
+      if res_pair.delta > 0 then
+-- XXX      io.stderr:write((utils.tostring(res_pair)).."\n"..utils.tostring({ request = request, first = pair.first }).."\n======================================\n")
+        local unique_seg = { pair.first, res_pair.first, res_pair.second, request }
+        f = function () local res = unique_seg; return res end
+        local triplet = {
+          x = {
+            request  = pair.first,
+            commands = pair.second,
+          },
+          y = {
+            request  = res_pair.first,
+            commands = knowledge.pairs[utils.tostring(res_pair.first[1])].second,
+          },
+          z = {
+            request  = res_pair.second,
+            commands = knowledge.pairs[utils.tostring(res_pair.second[1])].second,
+          }
+        }
+        table.insert(triplets_dev, { triplet = triplet, dev = res_pair.delta })
+      else
+        assert(appa.count(pair.first, res_pair.first, res_pair.second, request))
         local f
         if segmentation.dynamic_cube then
           local f_ = segmentation.enumerate_segmentations_list(request, { res_pair.first, res_pair.second }, pair.first, params.cube_seg_max_segments)
@@ -127,7 +148,7 @@ local function enumerate_valid_triplets(request)
     generators_end.next = generators_start
   end
 --  assert(not generators_start or generators_end.next == generators_start)
-  return generators_start
+  return generators_start, triplets_dev
 end
 
 --------------------------------------------------------------------------------
@@ -137,10 +158,10 @@ function search.build_cubes(request, request_txt)
   local solutions = {}
   local triples   = {}
   local unknown   = knowledge.list_unknown(request)
-  if #unknown > 0 then
-    return {}, unknown
-  end
-  local g = enumerate_valid_triplets(request)
+--  if #unknown > 0 then
+--    return {}, unknown
+--  end
+  local g, triplets_dev = enumerate_valid_triplets(request)
   local triplets = {}
   local time = os.time()
   local iter      = 0
@@ -249,7 +270,59 @@ function search.build_cubes(request, request_txt)
       })
     end
   end
-  return solutions, {}
+
+  local solutions_dev = {}
+  for _, t in ipairs(triplets_dev) do
+    local x, y, z = t.triplet.x, t.triplet.y, t.triplet.z
+    local orig1 = request_txt
+    local orig2 = segmentation.concat(z.request) 
+    local approx1 = appa.solve_tab(x.request, y.request, z.request)
+    approx1 = approx1[#approx1]
+    if approx1 then approx1 = segmentation.concat(approx1.solution.t); end
+    local approx2 = appa.solve_tab(y.request, x.request, request)
+    approx2 = approx2[#approx2]
+    if approx2 then approx2 = segmentation.concat(approx2.solution.t); end
+    if approx1 or approx2 then
+      local results = {}
+      for _, com_x in pairs(x.commands) do
+        for _, com_y in pairs(y.commands) do
+          for _, com_z in pairs(z.commands) do
+            local res = appa.solve_tab(com_x, com_y, com_z)
+            if #res > 0 then
+              local s = res[#res].solution
+              table.insert(results, {
+                x = segmentation.concat(s.x, params.segment_delimiter),
+                y = segmentation.concat(s.y, params.segment_delimiter),
+                z = segmentation.concat(s.z, params.segment_delimiter),
+                t = segmentation.concat(s.t, params.segment_delimiter),
+                final = segmentation.concat(s.t),
+                latency = get_time() - global_time
+              })
+            end
+          end
+        end
+      end
+      if #results > 0 then
+        table.insert(solutions_dev, {results = results, triple = {
+          x = segmentation.concat(x.request, params.segment_delimiter),
+          y = segmentation.concat(y.request, params.segment_delimiter),
+          z = segmentation.concat(z.request, params.segment_delimiter),
+          X = x,
+          Y = y,
+          Z = z
+          },
+          latency = t.latency,
+          cube = true,
+          deviation = t.dev,
+          approx1 = approx1,
+          approx2 = approx2,
+          orig1 = orig1,
+          orig2 = orig2,
+        })
+      end
+    end
+  end
+  return solutions, unknown, solutions_dev
 end
 --------------------------------------------------------------------------------
 

@@ -165,6 +165,7 @@ for request_txt in lines() do
   local cube   = { time = 0, nb = 0, unknown = {} }
   local time = get_time()
   local solutions = {}
+  local solutions_dev = {}
   global_time = get_time()
   local existing = knowledge.pairs[utils.tostring(request[1])]
   if existing then
@@ -189,11 +190,14 @@ for request_txt in lines() do
     if use_cubes then
       loc_time = get_time()
       global_time = loc_time
-      local cubes
-      cubes, cube.unknown = search.build_cubes(request, request_txt)
+      local cubes, cubes_dev
+      cubes, cube.unknown, cubes_dev = search.build_cubes(request, request_txt)
       for _, s in ipairs(cubes) do
         table.insert(solutions, s)
         cube.nb = cube.nb + 1
+      end
+      for _, s in ipairs(cubes_dev) do
+        table.insert(solutions_dev, s)
       end
       cube.time = get_time() - loc_time
     end
@@ -219,9 +223,9 @@ for request_txt in lines() do
     print("input #"..num_input.." -> \""..request_txt.."\"")
   end
 
+  print(string.format("detail square    time = %.3f   results = %3d          ", square.time / time_unit, square.nb))
+  print(string.format("detail cube      time = %.3f   results = %3d          ", cube.time / time_unit, cube.nb))
   if #solutions > 0 then
-    print(string.format("detail square    time = %.3f   results = %3d          ", square.time / time_unit, square.nb))
-    print(string.format("detail cube      time = %.3f   results = %3d          ", cube.time / time_unit, cube.nb))
     for _, s in ipairs(solutions) do
       if s.singleton then
         table.insert(list, solutions[1].results[1])
@@ -271,6 +275,35 @@ for request_txt in lines() do
       print(string.format("result not found (%d US) \"%s\"", #cube.unknown, request_txt))
     else
       print(string.format("result not found \"%s\"", request_txt))
+    end
+    for _, s in ipairs(solutions_dev) do
+      assert(s.cube)
+      for _, r in ipairs(s.results) do
+        table.insert(list, r.final)
+        print(string.format("latency_solution %2.3f", r.latency / time_unit))
+        print(string.format("result cube_dev  %6d -> %s", #list, r.final))
+        print(string.format("detail triple O  %s\t%s\t%s", r.x, r.y, r.z))
+      end
+
+      assert(#s.results > 0)
+      print(string.format(  "detail triple I  %s\t%s\t%s",
+        s.triple.x,
+        s.triple.y,
+        s.triple.z
+      ))
+      if s.approx1 then
+        print(string.format("detail origin 1 %s", s.orig1  ))
+        print(string.format("detail approx 1 %s", s.approx1))
+      end
+      if s.approx2 then
+        print(string.format("detail origin 2 %s", s.orig2  ))
+        print(string.format("detail approx 2 %s", s.approx2))
+      end
+      print(string.format(  "detail commands  x = %2d\ty = %2d\tz = %2d",
+        utils.table.len(s.triple.X.commands),
+        utils.table.len(s.triple.Y.commands),
+        utils.table.len(s.triple.Z.commands)
+      ))
     end
   end
   print(string.format("detail length    %d", #request[1]))
