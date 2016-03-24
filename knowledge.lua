@@ -195,7 +195,13 @@ function tc.retrieve_generic(tree, counts, deviation)
   assert(deviation >= 0)
   local missing = 0
   for w, c in pairs(counts) do
-    if not knowledge.histogram[w] then
+    local h = knowledge.histogram[w]
+    if not h then
+      knowledge.histogram[w] = 0
+      table.insert(knowledge.lexicon, w)
+      print("new token \""..w.."\"")
+    end
+    if (h or 0) == 0 then
       missing = missing + c
       if missing > deviation then -- More than deviation occurrences are missing
         return {}
