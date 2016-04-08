@@ -1,5 +1,6 @@
 local search = {
-  static_cut = false
+  static_cut = false,
+  deviation  = 0
 }
 
 local params = {
@@ -71,13 +72,12 @@ local function enumerate_valid_triplets(request)
     if #triplets >= params.cube_seg_max_triplets1 then
       break
     end
-    local res = knowledge.retrieve(request, pair.first, 1)
+    local res = knowledge.retrieve(request, pair.first, search.deviation)
     for _, res_pair in ipairs(res) do
       if #triplets >= params.cube_seg_max_triplets1 then
         break
       end
       if res_pair.delta > 0 then
--- XXX      io.stderr:write((utils.tostring(res_pair)).."\n"..utils.tostring({ request = request, first = pair.first }).."\n======================================\n")
         local unique_seg = { pair.first, res_pair.first, res_pair.second, request }
         f = function () local res = unique_seg; return res end
         local triplet = {
@@ -271,7 +271,8 @@ function search.build_cubes(request, request_txt)
     end
   end
 
-  local solutions_dev = {}
+  local per_dev = {}
+  local highest_dev = 0
   for _, t in ipairs(triplets_dev) do
     local x, y, z = t.triplet.x, t.triplet.y, t.triplet.z
     local orig1 = request_txt
@@ -303,7 +304,11 @@ function search.build_cubes(request, request_txt)
         end
       end
       if #results > 0 then
-        table.insert(solutions_dev, {results = results, triple = {
+        if t.dev > highest_dev then
+          highest_dev = t.dev
+        end
+        local tab = per_dev[t.dev] or {}
+        table.insert(tab, {results = results, triple = {
           x = segmentation.concat(x.request, params.segment_delimiter),
           y = segmentation.concat(y.request, params.segment_delimiter),
           z = segmentation.concat(z.request, params.segment_delimiter),
@@ -319,9 +324,17 @@ function search.build_cubes(request, request_txt)
           orig1 = orig1,
           orig2 = orig2,
         })
+        per_dev[t.dev] = tab
       end
     end
   end
+  local solutions_dev = {}
+  for i=1,highest_dev do
+    for _, s in ipairs(per_dev[i] or {}) do
+      table.insert(solutions_dev, s)
+    end
+  end
+
   return solutions, unknown, solutions_dev
 end
 --------------------------------------------------------------------------------
