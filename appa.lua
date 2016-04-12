@@ -628,6 +628,453 @@ function appa.solve_tab(A, B, C)
   }
 end
 
+function appa.solve_tab_approx(A, B, C, deviation_max)
+  deviation_max = deviation_max or 0
+  local mode = A.mode
+
+  -- TODO solve in character mode then check for the presence of all segments of the word segmented sequences
+  -- and delegate this code to segmentation.lua (or segmentation.c)
+  if A.mode == "words" or B.mode == "words" or C.mode == "words" then
+    mode = "words"
+    if A.mode ~= "words" then
+      A = segmentation.chunk("words", segmentation.concat(A))
+    elseif B.mode ~= "words" then
+      B = segmentation.chunk("words", segmentation.concat(B))
+    elseif C.mode ~= "words" then
+      C = segmentation.chunk("words", segmentation.concat(C))
+    end
+  end
+
+  assert(A.mode == B.mode and A.mode == C.mode)
+
+  -- Si A == C alors B == D
+  if utils.deepcompare(A, C) then
+    return {
+      {
+        solution = {
+          x = A,
+          y = B,
+          z = C,
+          t = utils.table.deep_copy(B)
+        },
+        factors = 1
+      }
+    }
+  elseif utils.deepcompare(A, B) then
+    return {
+      {
+        solution = {
+          x = A,
+          y = B,
+          z = C,
+          t = utils.table.deep_copy(C)
+        },
+        factors = 1
+      }
+    }
+  end
+
+--  -- Checking symbol counts
+--  local test, segments = appa.count(A, B, C)
+--  if not test then
+--    return {}
+--  end
+  local compatibilities = {
+    Di  = { ["true"] = { "Di", "ij", "Dij", "ik", "Dik", "j", "Dj", "k", "Dk" }, ["false"] = {} },
+    ij  = { ["true"] = { "Di", "ij", "Dik", "Dj", "k", "Dk" }, ["false"] = { "Dij", "ik", "j" } },
+    Dij = { ["true"] = { "Di", "Dij", "ik", "j", "k", "Dk" }, ["false"] = { "ij", "Dik", "Dj" } },
+    ik  = { ["true"] = { "Di", "ik", "Dij", "Dk", "j", "Dj" }, ["false"] = { "Dik", "ij", "k" } },
+    Dik = { ["true"] = { "Di", "Dik", "ij", "k", "j", "Dj" }, ["false"] = { "ik", "Dij", "Dk" } },
+    j   = { ["true"] = { "Di", "Dij", "ik", "Dik", "j", "Dk" }, ["false"] = { "ij", "Dj", "k" } },
+    Dj  = { ["true"] = { "Di", "ij", "Dij", "ik", "Dik", "Dj", "k", "Dk" }, ["false"] = { "j" } },
+    k   = { ["true"] = { "Di", "Dik", "ij", "Dij", "k", "Dj" }, ["false"] = { "ik", "Dk", "j" } },
+    Dk  = { ["true"] = { "Di", "ik", "Dik", "ij", "Dij", "Dk", "j", "Dj" }, ["false"] = { "k" } },
+--  D   = 
+--  ijk  ?
+--  Dijk ?
+  }
+
+  x = A[1]
+  y = B[1]
+  z = C[1]
+  local X, Y, Z = #x, #y, #z
+  local a = {}
+  a.crawl = function (a, b, c)
+    return ((a * (Y+1) + b) * (Z+1)) + c
+  end
+  local default_empty = {}
+  for dev = 0, deviation_max do
+    for p, _ in pairs(compatibilities) do
+      local default = {}
+      default[p] = math.huge
+    end
+    default_empty[dev] = default
+  end
+  for i=0,X do
+    for j=0,Y do
+      for k=0,Z do
+        if Y - j + Z - k >= X - i and j + k >= i then
+          if i == 0 and i == j and j == k then
+            a[a.crawl(i, j, k)] = { [0] = { ij = 1, ik = 1, j = 1, k = 1 } }
+          else
+            assert(a[a.crawl(i, j, k)] == nil)
+            local S = {}
+            for dev = 0, deviation_max do
+              if dev == 0 then
+                S[dev] = {}
+              end
+              if dev < deviation_max then
+                S[dev+1] = {}
+              end
+              if i > 0 then
+                if j > 0 then
+                  local prev = (a[a.crawl(i-1, j-1, k  )] or default_empty)[dev] or {}
+                  if x[i] == y[j] then
+                    local min = math.huge
+                    local path = {}
+                    for _, p in ipairs(compatibilities.ij["true"]) do
+                      if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                        if prev[p] < min then
+                          path = {}
+                        end
+                        min = prev[p]
+                        table.insert(path, p)
+                      end
+                    end
+                    for _, p in ipairs(compatibilities.ij["false"]) do
+                      if prev[p] and prev[p] ~= math.huge and (prev[p] + 1 <= min) then
+                        if prev[p] < min then
+                          path = {}
+                        end
+                        min = prev[p] + 1
+                        table.insert(path, p)
+                      end
+                    end
+                    S[dev].ij      = min
+                    S[dev].ij_path = path
+                  elseif dev < deviation_max then  -- substitution of x[i] by y[j]
+                    local min = math.huge
+                    local path = {}
+                    for _, p in ipairs(compatibilities.Dij["true"]) do
+                      if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                        if prev[p] < min then
+                          path = {}
+                        end
+                        min = prev[p]
+                        table.insert(path, p)
+                      end
+                    end
+                    for _, p in ipairs(compatibilities.Dij["false"]) do
+                      if prev[p] and prev[p] ~= math.huge and (prev[p] + 1 <= min) then
+                        if prev[p] < min then
+                          path = {}
+                        end
+                        min = prev[p] + 1
+                        table.insert(path, p)
+                      end
+                    end
+                    S[dev+1].Dij      = min
+                    S[dev+1].Dij_path = path
+                  end
+                else
+                  S[dev].ij = math.huge
+                  if dev < deviation_max then
+                    S[dev+1].Dij = math.huge
+                  end
+                end
+                if k > 0 then
+                  local prev = (a[a.crawl(i-1, j  , k-1)] or default_empty)[dev] or {}
+                  local min = math.huge
+                  local path = {}
+                  if x[i] == z[k] then
+                    for _, p in ipairs(compatibilities.ik["true"]) do
+                      if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                        if prev[p] < min then
+                          path = {}
+                        end
+                        min = prev[p]
+                        table.insert(path, p)
+                      end
+                    end
+                    for _, p in ipairs(compatibilities.ik["false"]) do
+                      if prev[p] and prev[p] ~= math.huge and (prev[p] + 1 <= min) then
+                        if prev[p] < min then
+                          path = {}
+                        end
+                        min = prev[p] + 1
+                        table.insert(path, p)
+                      end
+                    end
+                    S[dev].ik      = min
+                    S[dev].ik_path = path
+                  elseif dev < deviation_max then  -- substitution of x[i] by z[k]
+                    local min = math.huge
+                    local path = {}
+                    for _, p in ipairs(compatibilities.Dik["true"]) do
+                      if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                        if prev[p] < min then
+                          path = {}
+                        end
+                        min = prev[p]
+                        table.insert(path, p)
+                      end
+                    end
+                    for _, p in ipairs(compatibilities.Dik["false"]) do
+                      if prev[p] and prev[p] ~= math.huge and (prev[p] + 1 <= min) then
+                        if prev[p] < min then
+                          path = {}
+                        end
+                        min = prev[p] + 1
+                        table.insert(path, p)
+                      end
+                    end
+                    S[dev+1].Dik      = min
+                    S[dev+1].Dik_path = path
+                  end
+                else
+                  S[dev].ik = math.huge
+                  if dev < deviation_max then
+                    S[dev+1].Dik = math.huge
+                  end
+                end
+                if dev < deviation_max then  -- deletion of x[i]
+                  local prev = (a[a.crawl(i-1, j, k)] or default_empty)[dev] or {}
+                  local min = math.huge
+                  local path = {}
+                  for _, p in ipairs(compatibilities.Di["true"]) do
+                    if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                      if prev[p] < min then
+                        path = {}
+                      end
+                      min = prev[p]
+                      table.insert(path, p)
+                    end
+                  end
+                  for _, p in ipairs(compatibilities.Di["false"]) do
+                    if prev[p] and prev[p] ~= math.huge and (prev[p] + 1 <= min) then
+                      if prev[p] < min then
+                        path = {}
+                      end
+                      min = prev[p] + 1
+                      table.insert(path, p)
+                    end
+                  end
+                  S[dev+1].Di      = min
+                  S[dev+1].Di_path = path
+                end
+              elseif dev < deviation_max then
+                S[dev+1].Di = math.huge
+              end
+              if j > 0 then
+                local prev = (a[a.crawl(i  , j-1, k  )] or default_empty)[dev] or {}
+                local min = math.huge
+                local path = {}
+                  for _, p in ipairs(compatibilities.j["true"]) do
+                  if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                    if prev[p] < min then
+                      path = {}
+                    end
+                    min = prev[p]
+                    table.insert(path, p)
+                  end
+                end
+                  for _, p in ipairs(compatibilities.j["false"]) do
+                  if prev[p] and prev[p] ~= math.huge and (prev[p] + 1 <= min) then
+                    if prev[p] < min then
+                      path = {}
+                    end
+                    min = prev[p] + 1
+                    table.insert(path, p)
+                  end
+                end
+                S[dev].j      = min
+                S[dev].j_path = path
+                if dev < deviation_max then  -- deletion of y[j]
+                  local min = math.huge
+                  local path = {}
+                  for _, p in ipairs(compatibilities.Dj["true"]) do
+                    if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                      if prev[p] < min then
+                        path = {}
+                      end
+                      min = prev[p]
+                      table.insert(path, p)
+                    end
+                  end
+                  for _, p in ipairs(compatibilities.Dj["false"]) do
+                    if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                      if prev[p] < min then
+                        path = {}
+                      end
+                      min = prev[p] + 1
+                      table.insert(path, p)
+                    end
+                  end
+                  S[dev+1].Dj      = min
+                  S[dev+1].Dj_path = path
+                end
+              else
+                S.j = math.huge
+                if dev < deviation_max then
+                  S[dev+1].Dj = math.huge
+                end
+              end
+              if k > 0 then
+                local prev = (a[a.crawl(i  , j  , k-1)] or default_empty)[dev] or {}
+                local min = math.huge
+                local path = {}
+                for _, p in ipairs(compatibilities.k["true"]) do
+                  if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                    if prev[p] < min then
+                      path = {}
+                    end
+                    min = prev[p]
+                    table.insert(path, p)
+                  end
+                end
+                for _, p in ipairs(compatibilities.k["false"]) do
+                  if prev[p] and prev[p] ~= math.huge and (prev[p] + 1 <= min) then
+                    if prev[p] < min then
+                      path = {}
+                    end
+                    min = prev[p] + 1
+                    table.insert(path, p)
+                  end
+                end
+                S[dev].k      = min
+                S[dev].k_path = path
+                if dev < deviation_max then  -- deletion of z[k]
+                  local min = math.huge
+                  local path = {}
+                  for _, p in ipairs(compatibilities.Dk["true"]) do
+                    if prev[p] and prev[p] ~= math.huge and (prev[p] <= min) then
+                      if prev[p] < min then
+                        path = {}
+                      end
+                      min = prev[p]
+                      table.insert(path, p)
+                    end
+                  end
+                  for _, p in ipairs(compatibilities.Dk["false"]) do
+                    if prev[p] and prev[p] ~= math.huge and (prev[p] + 1 <= min) then
+                      if prev[p] < min then
+                        path = {}
+                      end
+                      min = prev[p] + 1
+                      table.insert(path, p)
+                    end
+                  end
+                  S[dev+1].Dk      = min
+                  S[dev+1].Dk_path = path
+                end
+              else
+                S.k = math.huge
+                if dev < deviation_max then
+                  S[dev+1].Dk = math.huge
+                end
+              end
+              a[a.crawl(i, j, k)] = S
+            end
+          end
+        end
+      end
+    end
+  end
+  local exact = {}
+  local approximations = {}
+  for dev = 0, deviation_max do
+    local dev_track = dev
+    local solution = {}
+    local factors
+    do
+      local i, j, k = X, Y, Z
+      local path
+      while i > 0 or j > 0 or k > 0 do
+        utils.write { cells = a[a.crawl(i, j, k)], i = i, j = j, k = k, dev = dev, track = dev_track }
+        local cell = a[a.crawl(i, j, k)][dev]
+        cell.ij = cell.ij or math.huge
+        local min
+        if i == X and j == Y and k == Z then
+          local m = math.huge
+          for _, p in ipairs { "ij", "ik", "j", "k", "Di", "Dj", "Dk", "Dij", "Dik" } do
+            if m == math.huge or (cell[p] or math.huge) < cell[min] then
+              min = p
+              m = cell[min] or math.huge
+            end
+          end
+          factors = cell[min] or math.huge
+          if factors == math.huge then
+            solution = nil
+            break
+          else
+            assert(cell[min.."_path"])
+          end
+        else
+          min = path
+        end
+        utils.write { min = min }
+        path = cell[min.."_path"][1]
+        utils.write { min = min, path = path }
+        if min == "j" then
+          solution[j+k-i] = y[j]
+          j = j-1
+        elseif min == "k" then
+          solution[j+k-i] = z[k]
+          k = k-1
+        elseif min == "ij" then
+          i, j = i-1, j-1
+        elseif min == "ik" then
+          i, k = i-1, k-1
+        elseif min == "Di" then
+          i = i-1
+          assert(dev > 0)
+          dev = dev - 1
+        elseif min == "Dj" then
+          j = j-1
+          assert(dev > 0)
+          dev = dev - 1
+        elseif min == "Dk" then
+          k = k-1
+          assert(dev > 0)
+          dev = dev - 1
+        elseif min == "Dij" then
+          i, j = i-1, j-1
+          assert(dev > 0)
+          dev = dev - 1
+        elseif min == "Dik" then
+          i, k = i-1, k-1
+          assert(dev > 0)
+          dev = dev - 1
+        end
+      end
+    end
+    if dev_track == 0 then
+      exact = solution
+    else
+      table.insert(approximations, solution)
+    end
+  end
+  if exact ~= nil then
+    return {
+      {
+        solution = {
+          x = A,
+          y = B,
+          z = C,
+          t = {
+            exact,
+            mode = mode
+          },
+        },
+        factors = factors
+      }
+    }, approximations
+  else
+    return {}, approximations
+  end
+end
+
+
 function appa.solve_tree(x, y, z)
   local function sort_f(node1, node2)
     return node1.value > node2.value
