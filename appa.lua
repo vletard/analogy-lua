@@ -982,96 +982,124 @@ function appa.solve_tab_approx(A, B, C, deviation_max)
   end
   local exact = {}
   local approximations = {}
-  for dev = 0, deviation_max do
-    local dev_track = dev
-    local solution = {}
+  for dev_track = 0, deviation_max do
+    local final = {}
+    local solutions = { { i = X, j = Y, k = Z, dev = dev_track, path = {} } }
+--     local paths = { {} }
+--     local mins = { {} }
+--     local coords = { { i = X, j = Y, k = Z } }
     local factors
-    do
-      local i, j, k = X, Y, Z
-      local path
-      while i > 0 or j > 0 or k > 0 do
-        utils.write { cells = a[a.crawl(i, j, k)], i = i, j = j, k = k, dev = dev, track = dev_track }
-        local cell = a[a.crawl(i, j, k)][dev]
-        cell.ij = cell.ij or math.huge
-        local min
+    while #solutions > 0 do
+      local solutions_next = {}
+      for n, sol in ipairs(solutions) do
+        local i, j, k = sol.i, sol.j, sol.k
+        local cell = a[a.crawl(i, j, k)][sol.dev]
+        local min = {}
         if i == X and j == Y and k == Z then
           local m = math.huge
           for _, p in ipairs { "ij", "ik", "j", "k", "Di", "Dj", "Dk", "Dij", "Dik" } do
-            if m == math.huge or (cell[p] or math.huge) < cell[min] then
-              min = p
-              m = cell[min] or math.huge
+            if (cell[p] or math.huge) <= m then
+              if (cell[p] or math.huge) < m then
+                min = {}
+                m = cell[p]
+              end
+              table.insert(min, p)
+              m = cell[p] or math.huge
             end
           end
-          factors = cell[min] or math.huge
+          factors = cell[min[1]] or math.huge
           if factors == math.huge then
-            solution = nil
+            solutions_next = {}
             break
-          else
-            assert(cell[min.."_path"])
           end
         else
-          min = path
+          min = { sol.path[#sol.path] }
         end
-        utils.write { min = min }
-        path = cell[min.."_path"][1]
-        utils.write { min = min, path = path }
-        if min == "j" then
-          solution[j+k-i] = y[j]
-          j = j-1
-        elseif min == "k" then
-          solution[j+k-i] = z[k]
-          k = k-1
-        elseif min == "ij" then
-          i, j = i-1, j-1
-        elseif min == "ik" then
-          i, k = i-1, k-1
-        elseif min == "Di" then
-          i = i-1
-          assert(dev > 0)
-          dev = dev - 1
-        elseif min == "Dj" then
-          j = j-1
-          assert(dev > 0)
-          dev = dev - 1
-        elseif min == "Dk" then
-          k = k-1
-          assert(dev > 0)
-          dev = dev - 1
-        elseif min == "Dij" then
-          i, j = i-1, j-1
-          assert(dev > 0)
-          dev = dev - 1
-        elseif min == "Dik" then
-          i, k = i-1, k-1
-          assert(dev > 0)
-          dev = dev - 1
+        for _, m in ipairs(min) do
+          for _, p in ipairs(cell[m.."_path"]) do
+--            utils.write { min = min, path = path }
+            local s_next = {}
+            for k, v in pairs(sol) do
+              s_next[k] = utils.table.deep_copy(v)
+            end
+            table.insert(s_next.path, p)
+            if m == "j" then
+              s_next[j+k-i] = y[j]
+              s_next.j = s_next.j-1
+            elseif m == "k" then
+              s_next[j+k-i] = z[k]
+              s_next.k = s_next.k-1
+            elseif m == "ij" then
+              s_next.i = s_next.i-1
+              s_next.j = s_next.j-1
+            elseif m == "ik" then
+              s_next.i = s_next.i-1
+              s_next.k = s_next.k-1
+            elseif m == "Di" then
+              s_next.i = s_next.i-1
+              assert(s_next.dev > 0)
+              s_next.dev = s_next.dev - 1
+            elseif m == "Dj" then
+              s_next.j = s_next.j-1
+              assert(s_next.dev > 0)
+              s_next.dev = s_next.dev - 1
+            elseif m == "Dk" then
+              s_next.k = s_next.k-1
+              assert(s_next.dev > 0)
+              s_next.dev = s_next.dev - 1
+            elseif m == "Dij" then
+              s_next.i = s_next.i-1
+              s_next.j = s_next.j-1
+              assert(s_next.dev > 0)
+              s_next.dev = s_next.dev - 1
+            elseif m == "Dik" then
+              s_next.i = s_next.i-1
+              s_next.k = s_next.k-1
+              assert(s_next.dev > 0)
+              s_next.dev = s_next.dev - 1
+            end
+            assert(s_next.i >= 0 and s_next.j >= 0 and s_next.k >= 0)
+            if s_next.i == 0 and s_next.j == 0 and s_next.k == 0 then
+              local f = {}
+              for _, e in ipairs(s_next) do
+                table.insert(f, e)
+              end
+              local repr = utils.tostring(f)
+              local current = final[repr]
+              if current then
+                current.n = current.n + 1
+              else
+                final[repr] = { f, mode = mode, n = 1 }
+              end
+            else
+              table.insert(solutions_next, s_next)
+            end
+          end
         end
       end
+      solutions = solutions_next
     end
     if dev_track == 0 then
-      exact = solution
+      exact = final
     else
-      table.insert(approximations, solution)
+      table.insert(approximations, final)
     end
   end
-  if exact ~= nil then
-    return {
-      {
-        solution = {
-          x = A,
-          y = B,
-          z = C,
-          t = {
-            exact,
-            mode = mode
-          },
-        },
-        factors = factors
-      }
-    }, approximations
-  else
-    return {}, approximations
+  assert(type(exact) == "table" and type(approximations) == "table")
+  local i_exact = {}
+  for _, e in pairs(exact) do
+    table.insert(i_exact, e)
   end
+  local i_approx = {}
+  for dev, approx in pairs(approximations) do
+    assert(type(dev) == "number")
+    local l_approx = {}
+    for _, e in pairs(approx) do
+      table.insert(l_approx, e)
+    end
+    i_approx[dev] = l_approx
+  end
+  return i_exact, i_approx
 end
 
 
