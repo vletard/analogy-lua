@@ -244,22 +244,21 @@ for request_txt in io.stdin:lines() do
             print(string.format("detail triple O  %s\t%s\t%s", r.x, r.y, r.z))
           end
 
-          if #s.results > 0 then
---            print(string.format("result cube1     \"%s\"", request_txt))
-            print(string.format(  "detail triple I  %s\t%s\t%s",
-              s.triple.x,
-              s.triple.y,
-              s.triple.z
---              segmentation.concat(s.triple.X.commands[next(s.triple.X.commands)]), 
---              segmentation.concat(s.triple.Y.commands[next(s.triple.Y.commands)]), 
---              segmentation.concat(s.triple.Z.commands[next(s.triple.Z.commands)]) 
-            ))
-            print(string.format("detail commands  x = %2d\ty = %2d\tz = %2d",
-              utils.table.len(s.triple.X.commands),
-              utils.table.len(s.triple.Y.commands),
-              utils.table.len(s.triple.Z.commands)
-            ))
-          end
+          assert(#s.results > 0)
+--          print(string.format("result cube1     \"%s\"", request_txt))
+          print(string.format(  "detail triple I  %s\t%s\t%s",
+            s.triple.x,
+            s.triple.y,
+            s.triple.z
+--            segmentation.concat(s.triple.X.commands[next(s.triple.X.commands)]), 
+--            segmentation.concat(s.triple.Y.commands[next(s.triple.Y.commands)]), 
+--            segmentation.concat(s.triple.Z.commands[next(s.triple.Z.commands)]) 
+          ))
+          print(string.format("detail commands  x = %2d\ty = %2d\tz = %2d",
+            utils.table.len(s.triple.X.commands),
+            utils.table.len(s.triple.Y.commands),
+            utils.table.len(s.triple.Z.commands)
+          ))
         end
 --        print(string.format("detail triple I  x = \"%s\"   y = \"%s\"   z = \"%s\"", s.triple.x, s.triple.y, s.triple.z))
       end
@@ -274,7 +273,7 @@ for request_txt in io.stdin:lines() do
     end
     for _, s in ipairs(solutions_dev) do
       print ""
-      print(string.format  ("latency_triple   %2.3f", s.latency / time_unit))
+--      print(string.format  ("latency_triple   %2.3f", s.latency / time_unit))
       if s.square then
         for _, r in ipairs(s.results) do
           table.insert(list, r.final)

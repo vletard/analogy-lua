@@ -10,7 +10,7 @@ local params = {
   timeout       =     1,
   debug         = false,
   max_segments  = 5,
-  max_concurrent_paths = 10
+  max_concurrent_paths = 1
 }
 
 math.randomseed(os.time())
@@ -662,9 +662,9 @@ function appa.solve_tab_approx(A, B, C, deviation_max)
 
   -- Si A == C alors B == D
   if utils.deepcompare(A, C) then
-    return { t = utils.table.deep_copy(B) }, {}
+    return { utils.table.deep_copy(B) }, {}
   elseif utils.deepcompare(A, B) then
-    return { t = utils.table.deep_copy(C) }, {}
+    return { utils.table.deep_copy(C) }, {}
   end
 
 --  -- Checking symbol counts

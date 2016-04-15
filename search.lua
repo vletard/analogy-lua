@@ -238,7 +238,6 @@ function search.build_cubes(request, request_txt)
     end
   end
 
-  utils.write "BEGIN"
   for _, t in ipairs(triplets) do
     local x, y, z = t.x, t.y, t.z
     local results = {}
@@ -281,7 +280,7 @@ function search.build_cubes(request, request_txt)
     for dev, set in pairs(results) do
       if dev == 0 then
         if #set > 0 then
-          table.insert(solutions, {results = results, triple = {
+          table.insert(solutions, {results = set, triple = {
             x = segmentation.concat(x.request, params.segment_delimiter),
             y = segmentation.concat(y.request, params.segment_delimiter),
             z = segmentation.concat(z.request, params.segment_delimiter),
@@ -296,7 +295,7 @@ function search.build_cubes(request, request_txt)
       else
         per_dev[dev] = per_dev[dev] or {}
         if #set > 0 then
-          table.insert(per_dev[dev], {results = results, triple = {
+          table.insert(per_dev[dev], {results = set, triple = {
             x = segmentation.concat(x.request, params.segment_delimiter),
             y = segmentation.concat(y.request, params.segment_delimiter),
             z = segmentation.concat(z.request, params.segment_delimiter),
@@ -312,7 +311,6 @@ function search.build_cubes(request, request_txt)
       end
     end
   end
-  utils.write "END"
 
   for _, t in ipairs(triplets_dev) do
     local x, y, z = t.triplet.x, t.triplet.y, t.triplet.z
@@ -346,7 +344,6 @@ function search.build_cubes(request, request_txt)
               for dev, set in ipairs(approx) do
                 for _, s in ipairs(set) do
                   results[dev] = results[dev] or {}
-                  local s = res[#res].solution
                   table.insert(results[dev], {
                     x = segmentation.concat(com_x, params.segment_delimiter),
                     y = segmentation.concat(com_y, params.segment_delimiter),
@@ -370,7 +367,7 @@ function search.build_cubes(request, request_txt)
             highest_dev = final_dev
           end
           local tab = per_dev[final_dev] or {}
-          table.insert(tab, {results = results, triple = {
+          table.insert(tab, {results = set, triple = {
             x = segmentation.concat(x.request, params.segment_delimiter),
             y = segmentation.concat(y.request, params.segment_delimiter),
             z = segmentation.concat(z.request, params.segment_delimiter),
