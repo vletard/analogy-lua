@@ -9,10 +9,23 @@ local params = {
   min_coef      =   100,               -- Ratio minimal entre les deux meilleures occurrences : 1 + min_coef / meilleure_occurrence
   timeout       =     1,
   debug         = false,
-  max_segments  = 5
+  max_segments  = 5,
+  max_concurrent_paths = 10
 }
 
 math.randomseed(os.time())
+ 
+local function shuffleTable( t )
+  local rand = math.random 
+  assert( type(t) == "table")
+  local iterations = #t
+  local j
+       
+  for i = iterations, 2, -1 do
+    j = rand(i)
+    t[i], t[j] = t[j], t[i]
+  end
+end
 
 local stack = ""
 local write = function(arg)
@@ -649,29 +662,9 @@ function appa.solve_tab_approx(A, B, C, deviation_max)
 
   -- Si A == C alors B == D
   if utils.deepcompare(A, C) then
-    return {
-      {
-        solution = {
-          x = A,
-          y = B,
-          z = C,
-          t = utils.table.deep_copy(B)
-        },
-        factors = 1
-      }
-    }
+    return { t = utils.table.deep_copy(B) }, {}
   elseif utils.deepcompare(A, B) then
-    return {
-      {
-        solution = {
-          x = A,
-          y = B,
-          z = C,
-          t = utils.table.deep_copy(C)
-        },
-        factors = 1
-      }
-    }
+    return { t = utils.table.deep_copy(C) }, {}
   end
 
 --  -- Checking symbol counts
@@ -973,8 +966,8 @@ function appa.solve_tab_approx(A, B, C, deviation_max)
                   S[dev+1].Dk = math.huge
                 end
               end
-              a[a.crawl(i, j, k)] = S
             end
+            a[a.crawl(i, j, k)] = S
           end
         end
       end
@@ -991,7 +984,10 @@ function appa.solve_tab_approx(A, B, C, deviation_max)
     local factors
     while #solutions > 0 do
       local solutions_next = {}
-      for n, sol in ipairs(solutions) do
+      local max = math.min(params.max_concurrent_paths, #solutions)
+      shuffleTable(solutions)
+      for n = 1, max do
+        local sol = solutions[n]
         local i, j, k = sol.i, sol.j, sol.k
         local cell = a[a.crawl(i, j, k)][sol.dev]
         local min = {}
@@ -1091,8 +1087,7 @@ function appa.solve_tab_approx(A, B, C, deviation_max)
     table.insert(i_exact, e)
   end
   local i_approx = {}
-  for dev, approx in pairs(approximations) do
-    assert(type(dev) == "number")
+  for dev, approx in ipairs(approximations) do
     local l_approx = {}
     for _, e in pairs(approx) do
       table.insert(l_approx, e)
