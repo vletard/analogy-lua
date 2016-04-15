@@ -1,6 +1,7 @@
 local search = {
   static_cut = false,
-  deviation  = 0
+  deviation  = 0,
+  deviation_solve  = 0,
 }
 
 local params = {
@@ -156,6 +157,8 @@ end
 
 function search.build_cubes(request, request_txt)
   local solutions = {}
+  local per_dev = {}
+  local highest_dev = 0
   local triples   = {}
   local unknown   = knowledge.list_unknown(request)
 --  if #unknown > 0 then
@@ -235,44 +238,82 @@ function search.build_cubes(request, request_txt)
     end
   end
 
+  utils.write "BEGIN"
   for _, t in ipairs(triplets) do
     local x, y, z = t.x, t.y, t.z
     local results = {}
     for _, com_x in pairs(x.commands) do
       for _, com_y in pairs(y.commands) do
         for _, com_z in pairs(z.commands) do
-          local res = appa.solve_tab(com_x, com_y, com_z)
+          local res, approx = appa.solve_tab_approx(com_x, com_y, com_z, search.deviation_solve)
+          assert(type(approx) == "table")
           if #res > 0 then
-            local s = res[#res].solution
-            table.insert(results, {
-              x = segmentation.concat(s.x, params.segment_delimiter),
-              y = segmentation.concat(s.y, params.segment_delimiter),
-              z = segmentation.concat(s.z, params.segment_delimiter),
-              t = segmentation.concat(s.t, params.segment_delimiter),
-              final = segmentation.concat(s.t),
-              latency = get_time() - global_time
-            })
+            results[0] = results[0] or {}
+            for _, s in ipairs(res) do
+              table.insert(results[0], {
+                x = segmentation.concat(com_x, params.segment_delimiter),
+                y = segmentation.concat(com_y, params.segment_delimiter),
+                z = segmentation.concat(com_z, params.segment_delimiter),
+                t = segmentation.concat(s, params.segment_delimiter),
+                final = segmentation.concat(s),
+                latency = get_time() - global_time
+              })
+            end
+          else
+            for dev, set in ipairs(approx) do
+              results[dev] = results[dev] or {}
+              for _, s in ipairs(set) do
+                table.insert(results[dev], {
+                  x = segmentation.concat(com_x, params.segment_delimiter),
+                  y = segmentation.concat(com_y, params.segment_delimiter),
+                  z = segmentation.concat(com_z, params.segment_delimiter),
+                  t = segmentation.concat(s, params.segment_delimiter),
+                  final = segmentation.concat(s),
+                  deviation = dev,
+                  latency = get_time() - global_time
+                })
+              end
+            end
           end
         end
       end
     end
-    if #results > 0 then
-      table.insert(solutions, {results = results, triple = {
-        x = segmentation.concat(x.request, params.segment_delimiter),
-        y = segmentation.concat(y.request, params.segment_delimiter),
-        z = segmentation.concat(z.request, params.segment_delimiter),
-        X = x,
-        Y = y,
-        Z = z
-        },
-        latency = t.latency,
-        cube = true
-      })
+    for dev, set in pairs(results) do
+      if dev == 0 then
+        if #set > 0 then
+          table.insert(solutions, {results = results, triple = {
+            x = segmentation.concat(x.request, params.segment_delimiter),
+            y = segmentation.concat(y.request, params.segment_delimiter),
+            z = segmentation.concat(z.request, params.segment_delimiter),
+            X = x,
+            Y = y,
+            Z = z
+            },
+            latency = t.latency,
+            cube = true
+          })
+        end
+      else
+        per_dev[dev] = per_dev[dev] or {}
+        if #set > 0 then
+          table.insert(per_dev[dev], {results = results, triple = {
+            x = segmentation.concat(x.request, params.segment_delimiter),
+            y = segmentation.concat(y.request, params.segment_delimiter),
+            z = segmentation.concat(z.request, params.segment_delimiter),
+            X = x,
+            Y = y,
+            Z = z
+            },
+            latency = t.latency,
+            deviation_solve = dev,
+            cube = true
+          })
+        end
+      end
     end
   end
+  utils.write "END"
 
-  local per_dev = {}
-  local highest_dev = 0
   for _, t in ipairs(triplets_dev) do
     local x, y, z = t.triplet.x, t.triplet.y, t.triplet.z
     local orig1 = request_txt
@@ -288,43 +329,66 @@ function search.build_cubes(request, request_txt)
       for _, com_x in pairs(x.commands) do
         for _, com_y in pairs(y.commands) do
           for _, com_z in pairs(z.commands) do
-            local res = appa.solve_tab(com_x, com_y, com_z)
+            local res, approx = appa.solve_tab_approx(com_x, com_y, com_z, search.deviation_solve)
             if #res > 0 then
-              local s = res[#res].solution
-              table.insert(results, {
-                x = segmentation.concat(s.x, params.segment_delimiter),
-                y = segmentation.concat(s.y, params.segment_delimiter),
-                z = segmentation.concat(s.z, params.segment_delimiter),
-                t = segmentation.concat(s.t, params.segment_delimiter),
-                final = segmentation.concat(s.t),
-                latency = get_time() - global_time
-              })
+              results[0] = results[0] or {}
+              for _, s in ipairs(res) do
+                table.insert(results[0], {
+                  x = segmentation.concat(com_x, params.segment_delimiter),
+                  y = segmentation.concat(com_y, params.segment_delimiter),
+                  z = segmentation.concat(com_z, params.segment_delimiter),
+                  t = segmentation.concat(s, params.segment_delimiter),
+                  final = segmentation.concat(s),
+                  latency = get_time() - global_time
+                })
+              end
+            else
+              for dev, set in ipairs(approx) do
+                for _, s in ipairs(set) do
+                  results[dev] = results[dev] or {}
+                  local s = res[#res].solution
+                  table.insert(results[dev], {
+                    x = segmentation.concat(com_x, params.segment_delimiter),
+                    y = segmentation.concat(com_y, params.segment_delimiter),
+                    z = segmentation.concat(com_z, params.segment_delimiter),
+                    t = segmentation.concat(s, params.segment_delimiter),
+                    final = segmentation.concat(s),
+                    deviation = dev,
+                    latency = get_time() - global_time
+                  })
+                end
+              end
             end
           end
         end
       end
-      if #results > 0 then
-        if t.dev > highest_dev then
-          highest_dev = t.dev
+      for dev, set in pairs(results) do
+        local final_dev = dev + t.dev
+        assert(final_dev > 0)
+        if #set > 0 then
+          if final_dev > highest_dev then
+            highest_dev = final_dev
+          end
+          local tab = per_dev[final_dev] or {}
+          table.insert(tab, {results = results, triple = {
+            x = segmentation.concat(x.request, params.segment_delimiter),
+            y = segmentation.concat(y.request, params.segment_delimiter),
+            z = segmentation.concat(z.request, params.segment_delimiter),
+            X = x,
+            Y = y,
+            Z = z
+            },
+            latency = t.latency,
+            cube = true,
+            deviation_search = t.dev,
+            deviation_solve = dev,
+            approx1 = approx1,
+            approx2 = approx2,
+            orig1 = orig1,
+            orig2 = orig2,
+          })
+          per_dev[final_dev] = tab
         end
-        local tab = per_dev[t.dev] or {}
-        table.insert(tab, {results = results, triple = {
-          x = segmentation.concat(x.request, params.segment_delimiter),
-          y = segmentation.concat(y.request, params.segment_delimiter),
-          z = segmentation.concat(z.request, params.segment_delimiter),
-          X = x,
-          Y = y,
-          Z = z
-          },
-          latency = t.latency,
-          cube = true,
-          deviation = t.dev,
-          approx1 = approx1,
-          approx2 = approx2,
-          orig1 = orig1,
-          orig2 = orig2,
-        })
-        per_dev[t.dev] = tab
       end
     end
   end
@@ -368,6 +432,7 @@ end
 
 function search.build_squares(request, request_txt)
   local solutions = {}
+  local solutions_approx = {}
   local squares = {}
   local i = 0
   for _, pair in pairs(knowledge.pairs) do
@@ -378,15 +443,14 @@ function search.build_squares(request, request_txt)
         do 
           local seg = {pair.first, command, request}
 --          io.stderr:write("\nAPPA IN\n"..utils.tostring({segmentation.concat(seg[1]), segmentation.concat(seg[2]), segmentation.concat(seg[3])}).."\n")
-          local res = appa.solve_tab(seg[1], seg[2], seg[3])
-          if #res > 0 then
-            local s = res[#res].solution
+          local res, approx = appa.solve_tab_approx(seg[1], seg[2], seg[3], search.deviation_solve)
+          for _, s in ipairs(res) do
             table.insert(solutions, { results = { {
-              x = segmentation.concat(s.x, params.segment_delimiter),
-              y = segmentation.concat(s.y, params.segment_delimiter),
-              z = segmentation.concat(s.z, params.segment_delimiter),
-              t = segmentation.concat(s.t, params.segment_delimiter),
-              final = segmentation.concat(s.t),
+              x = segmentation.concat(seg[1], params.segment_delimiter),
+              y = segmentation.concat(seg[2], params.segment_delimiter),
+              z = segmentation.concat(seg[3], params.segment_delimiter),
+              t = segmentation.concat(s, params.segment_delimiter),
+              final = segmentation.concat(s),
               latency = get_time() - global_time,
               } },--[[, triple = {
               x = segmentation.concat(pair.first),
@@ -396,13 +460,42 @@ function search.build_squares(request, request_txt)
               latency = get_time() - global_time,
               square = true})
           end
+          for dev, set in ipairs(approx) do
+            solutions_approx[dev] = solutions_approx[dev] or {}
+            for _, s in ipairs(set) do
+              if #s[1] > 0 then
+                table.insert(solutions_approx[dev], { results = { {
+                  x = segmentation.concat(seg[1], params.segment_delimiter),
+                  y = segmentation.concat(seg[2], params.segment_delimiter),
+                  z = segmentation.concat(seg[3], params.segment_delimiter),
+                  t = segmentation.concat(s, params.segment_delimiter),
+                  final = segmentation.concat(s),
+                  latency = get_time() - global_time,
+                  } },--[[, triple = {
+                  x = segmentation.concat(pair.first),
+                  y = segmentation.concat(command),
+                  z = request_txt,
+                  }]]
+                  latency = get_time() - global_time,
+                  deviation = dev,
+                  square = true
+                })
+              end
+            end
+          end
         end
       end
 --    else
 --      log("[square] discarded: "..segmentation.concat(pair.first).."\n")
     end
   end
-  return solutions
+  local approx = {}
+  for _, set in ipairs(solutions_approx) do
+    for _, s in ipairs(set) do
+      table.insert(approx, s)
+    end
+  end
+  return solutions, approx
 end
 --------------------------------------------------------------------------------
 

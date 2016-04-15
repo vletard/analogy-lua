@@ -8,7 +8,11 @@ OPTIONS
   -h, --help
          prints this help summary
   -d, --deviation=N
+         allows deviations while searching *and* solving
+      --deviation-search=N
          allows the count sum to deviate of N while searching the count-tree
+      --deviation-solve=N
+         allows the deviations up to N while solving analogies
   -s, --source-examples=FILE
          looks for source sequences in FILE
   -t, --target-examples=FILE
@@ -40,7 +44,8 @@ source_segmentation=words
 target_segmentation=characters
 
 analogical_mode=both
-deviation=0
+deviation_search=0
+deviation_solve=0
 segmentation_mode=static
 
 interactive=false
@@ -48,7 +53,7 @@ input_file=
 
 ######################################################
 # Parsing the command line
-TEMP=`getopt -o d:s:t:p:aih --long deviation:example-base-pattern:,source-examples:,target-examples:,interactive,source-segmentation:,target-segmentation:,analogical-mode:,segmentation-mode:,help -n "$0" -- "$@"`
+TEMP=`getopt -o d:s:t:p:aih --long deviation:,deviation-search:,deviation-solve:,example-base-pattern:,source-examples:,target-examples:,interactive,source-segmentation:,target-segmentation:,analogical-mode:,segmentation-mode:,help -n "$0" -- "$@"`
 
 if [ $? != 0 ] ; then echo "Abandon" >&2 ; exit 1 ; fi
 
@@ -68,7 +73,14 @@ while true ; do
       example_base_target=$2
       shift 2 ;;
     -d|--deviation)
-      deviation=$2
+      deviation_search=$2
+      deviation_solve=$2
+      shift 2 ;;
+    --deviation-search)
+      deviation_search=$2
+      shift 2 ;;
+    --deviation-solve)
+      deviation_solve=$2
       shift 2 ;;
     -i|--interactive)
       interactive=true
@@ -119,9 +131,10 @@ example_base_target: $example_base_target
 source_segmentation: $source_segmentation
 target_segmentation: $target_segmentation
 analogical_mode:     $analogical_mode
-deviation:           $deviation
+deviation_search:    $deviation_search
+deviation_solve:     $deviation_solve
 segmentation_mode:   $segmentation_mode
 interactive:         $interactive
 " >&2
 
-cat $input_file | ./ilar.lua "$example_base_source" "$example_base_target" "$analogical_mode" "$segmentation_mode" "$interactive" "$deviation" "$source_segmentation" "$target_segmentation"
+cat $input_file | ./ilar.lua "$example_base_source" "$example_base_target" "$analogical_mode" "$segmentation_mode" "$interactive" "$deviation_search" "$deviation_solve" "$source_segmentation" "$target_segmentation"

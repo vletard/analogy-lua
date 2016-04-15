@@ -20,12 +20,13 @@ local full_resolution = true   -- assign false for optimized execution
 local key_file, value_file
 
 
-if #arg ~= 8 then
-  io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE ANALOGICAL_MODE DYNAMIC_SEG_MODE INTERACTIVE DEVIATION SOURCE_SEG TARGET_SEG")
+if #arg ~= 9 then
+  io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE ANALOGICAL_MODE DYNAMIC_SEG_MODE INTERACTIVE DEVIATION_SEARCH DEVIATION_SOLVE SOURCE_SEG TARGET_SEG")
   io.stderr:write("\n ANALOGICAL_MODE is one of intra, inter, both, singletons")
   io.stderr:write("\nDYNAMIC_SEG_MODE is one of static, static-cut, dynamic, dynamic-cube, dynamic-square")
   io.stderr:write("\n     INTERACTIVE is one of true, false")
-  io.stderr:write("\n       DEVIATION is an integer >= 0")
+  io.stderr:write("\nDEVIATION_SEARCH is an integer >= 0")
+  io.stderr:write("\n DEVIATION_SOLVE is an integer >= 0")
   io.stderr:write("\n      SOURCE_SEG is one of word, characters, words+spaces, pounds")
   io.stderr:write("\n      TARGET_SEG is one of word, characters, words+spaces, pounds")
   io.stderr:write("\n\n")
@@ -76,8 +77,13 @@ if not search.deviation then
   io.stderr("Argument 6 is incorrect ('"..arg[6].."').\n")
   os.exit(1)
 end
-segmentation.set_input_mode (arg[7])
-segmentation.set_output_mode(arg[8])
+search.deviation_solve = tonumber(arg[7])
+if not search.deviation_solve then
+  io.stderr("Argument 6 is incorrect ('"..arg[6].."').\n")
+  os.exit(1)
+end
+segmentation.set_input_mode (arg[8])
+segmentation.set_output_mode(arg[9])
 
 
 --------------------------------------------------------------------------------
@@ -164,10 +170,13 @@ for request_txt in io.stdin:lines() do
     if use_squares then
       loc_time = get_time()
       global_time = loc_time
-      local squares = search.build_squares(request, request_txt)
+      local squares, squares_dev = search.build_squares(request, request_txt)
       for _, s in ipairs(squares) do
         table.insert(solutions, s)
         square.nb = square.nb + 1
+      end
+      for _, s in ipairs(squares_dev) do
+        table.insert(solutions_dev, s)
       end
       square.time = get_time() - loc_time
     end
@@ -235,21 +244,22 @@ for request_txt in io.stdin:lines() do
             print(string.format("detail triple O  %s\t%s\t%s", r.x, r.y, r.z))
           end
 
-          assert(#s.results > 0)
---          print(string.format("result cube1     \"%s\"", request_txt))
-          print(string.format(  "detail triple I  %s\t%s\t%s",
-            s.triple.x,
-            s.triple.y,
-            s.triple.z
---            segmentation.concat(s.triple.X.commands[next(s.triple.X.commands)]), 
---            segmentation.concat(s.triple.Y.commands[next(s.triple.Y.commands)]), 
---            segmentation.concat(s.triple.Z.commands[next(s.triple.Z.commands)]) 
-          ))
-          print(string.format("detail commands  x = %2d\ty = %2d\tz = %2d",
-            utils.table.len(s.triple.X.commands),
-            utils.table.len(s.triple.Y.commands),
-            utils.table.len(s.triple.Z.commands)
-          ))
+          if #s.results > 0 then
+--            print(string.format("result cube1     \"%s\"", request_txt))
+            print(string.format(  "detail triple I  %s\t%s\t%s",
+              s.triple.x,
+              s.triple.y,
+              s.triple.z
+--              segmentation.concat(s.triple.X.commands[next(s.triple.X.commands)]), 
+--              segmentation.concat(s.triple.Y.commands[next(s.triple.Y.commands)]), 
+--              segmentation.concat(s.triple.Z.commands[next(s.triple.Z.commands)]) 
+            ))
+            print(string.format("detail commands  x = %2d\ty = %2d\tz = %2d",
+              utils.table.len(s.triple.X.commands),
+              utils.table.len(s.triple.Y.commands),
+              utils.table.len(s.triple.Z.commands)
+            ))
+          end
         end
 --        print(string.format("detail triple I  x = \"%s\"   y = \"%s\"   z = \"%s\"", s.triple.x, s.triple.y, s.triple.z))
       end
@@ -263,34 +273,46 @@ for request_txt in io.stdin:lines() do
       end
     end
     for _, s in ipairs(solutions_dev) do
-      assert(s.cube)
-      for _, r in ipairs(s.results) do
-        table.insert(list, r.final)
-        print(string.format("latency_solution %2.3f", r.latency / time_unit))
-        print(string.format("result cube_dev  %6d -> %s", #list, r.final))
-        print(string.format("detail deviation %d", s.deviation))
-        print(string.format("detail triple O  %s\t%s\t%s", r.x, r.y, r.z))
-      end
+      print ""
+      print(string.format  ("latency_triple   %2.3f", s.latency / time_unit))
+      if s.square then
+        for _, r in ipairs(s.results) do
+          table.insert(list, r.final)
+          print(string.format("latency_solution %2.3f", r.latency / time_unit))
+          print(string.format("result square    %6d -> %s", #list, r.final))
+          print(string.format("detail triple    %s\t%s\t%s", r.x, r.y, r.z))
+          print(string.format("detail deviation %d", s.deviation))
+        end
+      else
+        assert(s.cube)
+        for _, r in ipairs(s.results) do
+          table.insert(list, r.final)
+          print(string.format("latency_solution %2.3f", r.latency / time_unit))
+          print(string.format("result cube_dev  %6d -> %s", #list, r.final))
+          print(string.format("detail deviation %d", s.deviation))
+          print(string.format("detail triple O  %s\t%s\t%s", r.x, r.y, r.z))
+        end
 
-      assert(#s.results > 0)
-      print(string.format(  "detail triple I  %s\t%s\t%s",
-        s.triple.x,
-        s.triple.y,
-        s.triple.z
-      ))
-      if s.approx1 then
-        print(string.format("detail origin 1 %s", s.orig1  ))
-        print(string.format("detail approx 1 %s", s.approx1))
+        assert(#s.results > 0)
+        print(string.format(  "detail triple I  %s\t%s\t%s",
+          s.triple.x,
+          s.triple.y,
+          s.triple.z
+        ))
+        if s.approx1 then
+          print(string.format("detail origin 1 %s", s.orig1  ))
+          print(string.format("detail approx 1 %s", s.approx1))
+        end
+        if s.approx2 then
+          print(string.format("detail origin 2 %s", s.orig2  ))
+          print(string.format("detail approx 2 %s", s.approx2))
+        end
+        print(string.format(  "detail commands  x = %2d\ty = %2d\tz = %2d",
+          utils.table.len(s.triple.X.commands),
+          utils.table.len(s.triple.Y.commands),
+          utils.table.len(s.triple.Z.commands)
+        ))
       end
-      if s.approx2 then
-        print(string.format("detail origin 2 %s", s.orig2  ))
-        print(string.format("detail approx 2 %s", s.approx2))
-      end
-      print(string.format(  "detail commands  x = %2d\ty = %2d\tz = %2d",
-        utils.table.len(s.triple.X.commands),
-        utils.table.len(s.triple.Y.commands),
-        utils.table.len(s.triple.Z.commands)
-      ))
     end
   end
   print(string.format("detail length    %d", #request[1]))
