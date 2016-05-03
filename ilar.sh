@@ -35,6 +35,8 @@ OPTIONS
          sets the segmentation of target sentences to one of \"words\", \"pounds\", \"words+spaces\",
          or \"characters\"
          \"characters\" is default
+  --time-limit-indirect=SECONDS
+         sets the time limit in seconds for searching indirect analogies
 "
 
 # Default/initial values
@@ -47,13 +49,14 @@ analogical_mode=both
 deviation_search=0
 deviation_solve=0
 segmentation_mode=static
+time_limit_indirect=-1
 
 interactive=false
 input_file=
 
 ######################################################
 # Parsing the command line
-TEMP=`getopt -o d:s:t:p:aih --long deviation:,deviation-search:,deviation-solve:,example-base-pattern:,source-examples:,target-examples:,interactive,source-segmentation:,target-segmentation:,analogical-mode:,segmentation-mode:,help -n "$0" -- "$@"`
+TEMP=`getopt -o d:s:t:p:aih --long deviation:,deviation-search:,deviation-solve:,example-base-pattern:,source-examples:,target-examples:,interactive,source-segmentation:,target-segmentation:,analogical-mode:,segmentation-mode:,time-limit-indirect:,help -n "$0" -- "$@"`
 
 if [ $? != 0 ] ; then echo "Abandon" >&2 ; exit 1 ; fi
 
@@ -93,6 +96,9 @@ while true ; do
       shift 2 ;;
     -a|--analogical-mode)
       analogical_mode=$2
+      shift 2 ;;
+    --time-limit-indirect)
+      time_limit_indirect=$2
       shift 2 ;;
     --segmentation-mode)
       echo "Changing the segmentation mode before the C version is out is discouraged." >&2
@@ -135,6 +141,7 @@ deviation_search:    $deviation_search
 deviation_solve:     $deviation_solve
 segmentation_mode:   $segmentation_mode
 interactive:         $interactive
+time_limit_indirect: $time_limit_indirect
 " >&2
 
-cat $input_file | ./ilar.lua "$example_base_source" "$example_base_target" "$analogical_mode" "$segmentation_mode" "$interactive" "$deviation_search" "$deviation_solve" "$source_segmentation" "$target_segmentation"
+cat $input_file | ./ilar.lua "$example_base_source" "$example_base_target" "$analogical_mode" "$segmentation_mode" "$interactive" "$deviation_search" "$deviation_solve" "$source_segmentation" "$target_segmentation" "$time_limit_indirect"

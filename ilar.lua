@@ -20,8 +20,8 @@ local full_resolution = true   -- assign false for optimized execution
 local key_file, value_file
 
 
-if #arg ~= 9 then
-  io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE ANALOGICAL_MODE DYNAMIC_SEG_MODE INTERACTIVE DEVIATION_SEARCH DEVIATION_SOLVE SOURCE_SEG TARGET_SEG")
+if #arg ~= 10 then
+  io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE ANALOGICAL_MODE DYNAMIC_SEG_MODE INTERACTIVE DEVIATION_SEARCH DEVIATION_SOLVE SOURCE_SEG TARGET_SEG CUBE_TIME_LIMIT")
   io.stderr:write("\n ANALOGICAL_MODE is one of intra, inter, both, singletons")
   io.stderr:write("\nDYNAMIC_SEG_MODE is one of static, static-cut, dynamic, dynamic-cube, dynamic-square")
   io.stderr:write("\n     INTERACTIVE is one of true, false")
@@ -29,6 +29,7 @@ if #arg ~= 9 then
   io.stderr:write("\n DEVIATION_SOLVE is an integer >= 0")
   io.stderr:write("\n      SOURCE_SEG is one of word, characters, words+spaces, pounds")
   io.stderr:write("\n      TARGET_SEG is one of word, characters, words+spaces, pounds")
+  io.stderr:write("\n CUBE_TIME_LIMIT is an integer (seconds), negative or null means no limit")
   io.stderr:write("\n\n")
   os.exit()
 end
@@ -84,6 +85,13 @@ if not search.deviation_solve then
 end
 segmentation.set_input_mode (arg[8])
 segmentation.set_output_mode(arg[9])
+do
+  local ctl = tonumber(arg[10])
+  if ctl and ctl > 0 then
+    search.cube_max_time = ctl
+  end
+end
+
 
 
 --------------------------------------------------------------------------------

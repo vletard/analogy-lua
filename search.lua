@@ -21,6 +21,9 @@ local params = {
 
 -- Return false if the stop parameters have been reached, true if not
 local function check_stop_params(iter, time, nb_triplets)
+  if search.cube_max_time and (os.time() - time) > search.cube_max_time then
+    return true
+  end
   if not segmentation.dynamic_cube and not search.static_cut then
     return true
   elseif nb_triplets > 0 then
