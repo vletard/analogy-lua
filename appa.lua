@@ -703,13 +703,15 @@ function appa.solve_tab_approx(A, B, C, deviation_max)
     end
     default_empty[dev] = default
   end
+  local loop=false
   for i=0,X do
     for j=0,Y do
       for k=0,Z do
-        if Y - j + Z - k >= X - i and j + k >= i then
+        if deviation_max > 0 or (Y - j + Z - k >= X - i and j + k >= i) then
           if i == 0 and i == j and j == k then
             a[a.crawl(i, j, k)] = { [0] = { ij = 1, ik = 1, j = 1, k = 1 } }
           else
+            loop=true
             assert(a[a.crawl(i, j, k)] == nil)
             local S = {}
             for dev = 0, deviation_max do
@@ -972,6 +974,13 @@ function appa.solve_tab_approx(A, B, C, deviation_max)
         end
       end
     end
+  end
+  if not loop then -- rare case: when X > Y + Z, there is no exact solution and the optimization skips the loop
+    local final_cell = {}
+    for i = 0, deviation_max do
+      final_cell[i] = {}
+    end
+    a[a.crawl(X, Y, Z)] = final_cell
   end
   local exact = {}
   local approximations = {}
