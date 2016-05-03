@@ -189,7 +189,7 @@ function search.build_cubes(request, request_txt)
               request  = seg[3],
               commands = g.next.triplet.z.commands,
             },
-            latency = get_time() - global_time
+            latency = utils.time() - global_time
           }
           table.insert(triplets, triplet)
 --          write(utils.tostring({["#triplets"] = #triplets, time = os.time() - time, size = l, iter = iter}).."\n")
@@ -225,7 +225,7 @@ function search.build_cubes(request, request_txt)
             request  = seg[3],
             commands = g.next.triplet.z.commands,
           },
-          latency = get_time() - global_time
+          latency = utils.time() - global_time
         }
         table.insert(triplets, triplet)
  --       write(utils.tostring({["#triplets"] = #triplets, time = os.time() - time, size = l}).."\n")
@@ -255,7 +255,7 @@ function search.build_cubes(request, request_txt)
                 z = segmentation.concat(com_z, params.segment_delimiter),
                 t = segmentation.concat(s, params.segment_delimiter),
                 final = segmentation.concat(s),
-                latency = get_time() - global_time
+                latency = utils.time() - global_time
               })
             end
           else
@@ -269,7 +269,7 @@ function search.build_cubes(request, request_txt)
                   t = segmentation.concat(s, params.segment_delimiter),
                   final = segmentation.concat(s),
                   deviation = dev,
-                  latency = get_time() - global_time
+                  latency = utils.time() - global_time
                 })
               end
             end
@@ -337,7 +337,7 @@ function search.build_cubes(request, request_txt)
                   z = segmentation.concat(com_z, params.segment_delimiter),
                   t = segmentation.concat(s, params.segment_delimiter),
                   final = segmentation.concat(s),
-                  latency = get_time() - global_time
+                  latency = utils.time() - global_time
                 })
               end
             else
@@ -351,7 +351,7 @@ function search.build_cubes(request, request_txt)
                     t = segmentation.concat(s, params.segment_delimiter),
                     final = segmentation.concat(s),
                     deviation = dev,
-                    latency = get_time() - global_time
+                    latency = utils.time() - global_time
                   })
                 end
               end
@@ -448,13 +448,13 @@ function search.build_squares(request, request_txt)
               z = segmentation.concat(seg[3], params.segment_delimiter),
               t = segmentation.concat(s, params.segment_delimiter),
               final = segmentation.concat(s),
-              latency = get_time() - global_time,
+              latency = utils.time() - global_time,
               } },--[[, triple = {
               x = segmentation.concat(pair.first),
               y = segmentation.concat(command),
               z = request_txt,
               }]]
-              latency = get_time() - global_time,
+              latency = utils.time() - global_time,
               square = true})
           end
           for dev, set in ipairs(approx) do
@@ -467,13 +467,13 @@ function search.build_squares(request, request_txt)
                   z = segmentation.concat(seg[3], params.segment_delimiter),
                   t = segmentation.concat(s, params.segment_delimiter),
                   final = segmentation.concat(s),
-                  latency = get_time() - global_time,
+                  latency = utils.time() - global_time,
                   } },--[[, triple = {
                   x = segmentation.concat(pair.first),
                   y = segmentation.concat(command),
                   z = request_txt,
                   }]]
-                  latency = get_time() - global_time,
+                  latency = utils.time() - global_time,
                   deviation = dev,
                   square = true
                 })

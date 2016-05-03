@@ -1,4 +1,4 @@
-utils = dofile "/people/letard/local/lib/lua/toolbox.lua"
+local utils = dofile "toolbox.lua"
 
 local knowledge = {
   lexicon    =  {},

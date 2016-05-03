@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
-local utils        = dofile "/people/letard/local/lib/lua/toolbox.lua"
+local utils        = dofile "toolbox.lua"
 knowledge    = dofile "knowledge.lua"
 appa         = dofile "appa.lua"
 search       = dofile "search.lua"
@@ -101,12 +101,7 @@ search.set_log  ( true)
 --------------------------------------------------------------------------------
 
 local time_unit = 1000000000
-function get_time()
-  local s, ns = os.time()
-  assert(type(ns) == "number")
-  return 1000000000*s + ns
-end
-global_time = get_time()
+global_time = utils.time()
 
 local function load_files(keys, values)
   local key_file   = io.open(keys)
@@ -153,22 +148,22 @@ for request_txt in io.stdin:lines() do
 
   local square = { time = 0, nb = 0 }
   local cube   = { time = 0, nb = 0, unknown = {} }
-  local time = get_time()
+  local time = utils.time()
   local solutions = {}
   local solutions_dev = {}
-  global_time = get_time()
+  global_time = utils.time()
   local existing = knowledge.pairs[utils.tostring(request[1])]
   if existing then
     local results = {}
     for _, com in pairs(existing.second) do
       table.insert(results, segmentation.concat(com))
     end
-    table.insert(solutions, {results = results, singleton = { x = request_txt }, latency = get_time() - global_time })
+    table.insert(solutions, {results = results, singleton = { x = request_txt }, latency = utils.time() - global_time })
   end
   if not existing or full_resolution then
     local loc_time
     if use_squares then
-      loc_time = get_time()
+      loc_time = utils.time()
       global_time = loc_time
       local squares, squares_dev = search.build_squares(request, request_txt)
       for _, s in ipairs(squares) do
@@ -178,10 +173,10 @@ for request_txt in io.stdin:lines() do
       for _, s in ipairs(squares_dev) do
         table.insert(solutions_dev, s)
       end
-      square.time = get_time() - loc_time
+      square.time = utils.time() - loc_time
     end
     if use_cubes then
-      loc_time = get_time()
+      loc_time = utils.time()
       global_time = loc_time
       local cubes, cubes_dev
       cubes, cube.unknown, cubes_dev = search.build_cubes(request, request_txt)
@@ -192,7 +187,7 @@ for request_txt in io.stdin:lines() do
       for _, s in ipairs(cubes_dev) do
         table.insert(solutions_dev, s)
       end
-      cube.time = get_time() - loc_time
+      cube.time = utils.time() - loc_time
     end
   end
 
@@ -315,7 +310,7 @@ for request_txt in io.stdin:lines() do
     end
   end
   print(string.format("detail length    %d", #request[1]))
-  print(string.format("detail totaltime %.3f", (get_time() - time) / time_unit ))
+  print(string.format("detail totaltime %.3f", (utils.time() - time) / time_unit ))
   print(string.format("final %s", (#singletons > 0 and singletons[1]) or (#list > 0 and list[1]) or ""))  -- TODO better choice !!!
   print ""
 
