@@ -11,7 +11,7 @@ segmentation = dofile "segmentation.lua"
 -- Parameters
 
 local interactive     = false
-local full_resolution = true   -- assign false for optimized execution
+local full_resolution = false  -- assign false for optimized execution
 
 
 -- End parameters
@@ -200,7 +200,7 @@ for request_txt in io.stdin:lines() do
   end
 
   local list = {}
-  local singletons = {}
+  local index_results = { singletons = {}, cubes = {}, squares = {} }
   ------------------------------------------------------------------------
   -- Logging
   ------------------------------------------------------------------------
@@ -225,7 +225,7 @@ for request_txt in io.stdin:lines() do
     for _, s in ipairs(solutions) do
       if s.singleton then
         table.insert(list, solutions[1].results[1])
-        table.insert(singletons, solutions[1].results[1])
+        table.insert(index_results.singletons, #list)
         print(string.format("result single    %6d -> %s", #list, solutions[1].results[1]))
         print(string.format("detail singleton %s", request_txt))
       else
@@ -234,6 +234,7 @@ for request_txt in io.stdin:lines() do
         if s.square then
           for _, r in ipairs(s.results) do
             table.insert(list, r.final)
+            table.insert(index_results.squares, #list)
             print(string.format("latency_solution %2.3f", r.latency / time_unit))
             print(string.format("result square    %6d -> %s", #list, r.final))
             print(string.format("detail triple    %s\t%s\t%s", r.x, r.y, r.z))
@@ -242,6 +243,7 @@ for request_txt in io.stdin:lines() do
           assert(s.cube)
           for _, r in ipairs(s.results) do
             table.insert(list, r.final)
+            table.insert(index_results.cubes, #list)
             print(string.format("latency_solution %2.3f", r.latency / time_unit))
             print(string.format("result cube      %6d -> %s", #list, r.final))
             print(string.format("detail triple O  %s\t%s\t%s", r.x, r.y, r.z))
@@ -280,6 +282,7 @@ for request_txt in io.stdin:lines() do
       if s.square then
         for _, r in ipairs(s.results) do
           table.insert(list, r.final)
+          table.insert(index_results.squares, #list)
           print(string.format("latency_solution %2.3f", r.latency / time_unit))
           print(string.format("result square    %6d -> %s", #list, r.final))
           print(string.format("detail triple    %s\t%s\t%s", r.x, r.y, r.z))
@@ -289,6 +292,7 @@ for request_txt in io.stdin:lines() do
         assert(s.cube)
         for _, r in ipairs(s.results) do
           table.insert(list, r.final)
+          table.insert(index_results.cubes, #list)
           print(string.format("latency_solution %2.3f", r.latency / time_unit))
           print(string.format("result cube_dev  %6d -> %s", #list, r.final))
           print(string.format("detail deviation %d", s.deviation))
@@ -319,7 +323,12 @@ for request_txt in io.stdin:lines() do
   end
   print(string.format("detail length    %d", #request[1]))
   print(string.format("detail totaltime %.3f", (utils.time() - time) / time_unit ))
-  print(string.format("final %s", (#singletons > 0 and singletons[1]) or (#list > 0 and list[1]) or ""))  -- TODO better choice !!!
+  print(string.format("final %s", 
+       (#index_results.singletons > 0 and list[index_results.singletons[1]])
+    or (#index_results.cubes      > 0 and list[index_results.cubes     [1]])
+    or (#index_results.squares    > 0 and list[index_results.squares   [1]])
+    or ""
+  ))  -- TODO better choice !!!
   print ""
 
   if interactive then
