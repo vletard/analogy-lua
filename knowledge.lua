@@ -322,7 +322,7 @@ function knowledge.retrieve(request, match, deviation)
     res = tc.retrieve_generic(knowledge.tree_count, counts, deviation)
   else
     res = {}
-    for _, f in ipairs(tc.retrieve_generic(tree, counts, 0)) do
+    for _, f in ipairs(tc.retrieve_generic(knowledge.tree_count, counts, 0)) do
       table.insert(res, { first = f.first, second = f.second })
     end
   end
