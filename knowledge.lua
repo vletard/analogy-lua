@@ -318,6 +318,12 @@ end
 function knowledge.retrieve(request, match, deviation)
   local counts = tc.encode(request[1], match[1])
   local res
+  if type(knowledge.tree_count) ~= "table" then
+    assert(knowledge.tree_count == nil)
+    knowledge.init()
+    assert(type(knowledge.tree_count) == "table")
+    knowledge.init = nil
+  end
   if deviation then
     res = tc.retrieve_generic(knowledge.tree_count, counts, deviation)
   else
@@ -331,7 +337,7 @@ function knowledge.retrieve(request, match, deviation)
 end
 
 -- Loads the pairs in input
--- The keys and values parameters must be iterators
+-- The keys and values parameters must be iterators over segmented sequences
 -- Returns 1 if there are more keys than values, -1 if the converse is true, 0 if the numbers match
 function knowledge.load(keys, values)
   local k, v = keys(), values()
@@ -339,7 +345,7 @@ function knowledge.load(keys, values)
   local histoindex = {}
   while k do
     if not v then
-      return 1
+      return 1 -- more keys than values
     end
     assert(not (#v[1] == 0 and #k[1] ~=0) and not (#v[1] ~= 0 and #k[1] == 0))
     if #k[1] ~= 0 and #v[1] ~= 0 then
@@ -362,31 +368,33 @@ function knowledge.load(keys, values)
     end
     k, v = keys(), values()
   end
-  local occurrencies, values = {}, {}
-  for segment, occ in pairs(histo) do
-    local t = occurrencies[occ] or {}
-    if #t == 0 then
-      table.insert(values, occ)
-    end
-    table.insert(t, segment)
-    occurrencies[occ] = t
-  end
-  table.sort(values, function (a, b) return b < a end)
-  local lexicon = {}
-  for _, occ in ipairs(values) do
-    for _, segment in ipairs(occurrencies[occ]) do
-      table.insert(lexicon, segment)
-    end
-  end
-  knowledge.histogram = histo
-  knowledge.lexicon   = lexicon
   if v then
-    return -1
+    return -1 -- more values than keys
   else
-    knowledge.tree_count = tc.build(knowledge.lexicon, knowledge.pairs)
-    local fd = io.open("/tmp/knowledge", "w")
-    fd:write(utils.tostring(knowledge.tree_count))
-    fd:close()
+    knowledge.histogram = histo
+    knowledge.init = function()
+      local occurrencies, values = {}, {}
+      for segment, occ in pairs(histo) do
+        local t = occurrencies[occ] or {}
+        if #t == 0 then
+          table.insert(values, occ)
+        end
+        table.insert(t, segment)
+        occurrencies[occ] = t
+      end
+      table.sort(values, function (a, b) return b < a end)
+      local lexicon = {}
+      for _, occ in ipairs(values) do
+        for _, segment in ipairs(occurrencies[occ]) do
+          table.insert(lexicon, segment)
+        end
+      end
+      knowledge.lexicon   = lexicon
+      knowledge.tree_count = tc.build(knowledge.lexicon, knowledge.pairs)
+    end
+--     local fd = io.open("/tmp/knowledge", "w")
+--     fd:write(utils.tostring(knowledge.tree_count))
+--     fd:close()
     return 0
   end
 end
