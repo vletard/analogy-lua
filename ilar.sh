@@ -56,7 +56,7 @@ input_file=
 
 ######################################################
 # Parsing the command line
-TEMP=`getopt -o d:s:t:p:aih --long deviation:,deviation-search:,deviation-solve:,example-base-pattern:,source-examples:,target-examples:,interactive,source-segmentation:,target-segmentation:,analogical-mode:,segmentation-mode:,time-limit-indirect:,help -n "$0" -- "$@"`
+TEMP=`getopt -o d:s:t:p:a:ih --long deviation:,deviation-search:,deviation-solve:,example-base-pattern:,source-examples:,target-examples:,interactive,source-segmentation:,target-segmentation:,analogical-mode:,segmentation-mode:,time-limit-indirect:,help -n "$0" -- "$@"`
 
 if [ $? != 0 ] ; then echo "Abandon" >&2 ; exit 1 ; fi
 
