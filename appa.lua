@@ -15,6 +15,14 @@ local params = {
 
 math.randomseed(os.time())
  
+function reverse_list(l)
+  local reversed = {}
+  for i=#l,0,-1 do
+    table.insert(reversed, l[i])
+  end
+  return reversed
+end
+
 local function shuffleTable( t )
   local rand = math.random 
   assert( type(t) == "table")
@@ -431,7 +439,7 @@ function appa.solve_tab(A, B, C)
           z = C,
           t = utils.table.deep_copy(B)
         },
-        factors = 1
+        factors = { A[1], B[1] }
       }
     }
   elseif utils.deepcompare(A, B) then
@@ -443,7 +451,7 @@ function appa.solve_tab(A, B, C)
           z = C,
           t = utils.table.deep_copy(C)
         },
-        factors = 1
+        factors = { A[1], C[1] }
       }
     }
   end
@@ -587,7 +595,7 @@ function appa.solve_tab(A, B, C)
     end
   end
   local solution = {}
-  local factors
+  local factors = { {{ mode = A.mode }, { mode = A.mode}} }
   do
     local i, j, k = X, Y, Z
     local path
@@ -604,8 +612,7 @@ function appa.solve_tab(A, B, C)
         if cell.k  < cell[min] then
           min = "k"
         end
-        factors = cell[min]
-        if factors == math.huge then
+        if cell[min] == math.huge then
           return {}
         end
       else
@@ -614,17 +621,44 @@ function appa.solve_tab(A, B, C)
       path = cell[min.."_path"][1]
       if min == "j" then
         solution[j+k-i] = y[j]
+        table.insert(factors[#factors][2], y[j])
+        if path == "k" or path == "ij" then
+          factors[#factors][1] = { reverse_list(factors[#factors][1]), mode = A.mode }
+          factors[#factors][2] = { reverse_list(factors[#factors][2]), mode = A.mode }
+          table.insert(factors, {{ mode = A.mode }, { mode = A.mode}})
+        end
         j = j-1
       elseif min == "k" then
         solution[j+k-i] = z[k]
+        table.insert(factors[#factors][2], z[k])
+        if path == "j" or path == "ik" then
+          factors[#factors][1] = { reverse_list(factors[#factors][1]), mode = A.mode }
+          factors[#factors][2] = { reverse_list(factors[#factors][2]), mode = A.mode }
+          table.insert(factors, {{ mode = A.mode }, { mode = A.mode}})
+        end
         k = k-1
       elseif min == "ij" then
+        table.insert(factors[#factors][1], x[i])
+        if path == "j" or path == "ik" then
+          factors[#factors][1] = { reverse_list(factors[#factors][1]), mode = A.mode }
+          factors[#factors][2] = { reverse_list(factors[#factors][2]), mode = A.mode }
+          table.insert(factors, {{ mode = A.mode }, { mode = A.mode}})
+        end
         i, j = i-1, j-1
       elseif min == "ik" then
+        table.insert(factors[#factors][1], x[i])
+        if path == "k" or path == "ij" then
+          factors[#factors][1] = { reverse_list(factors[#factors][1]), mode = A.mode }
+          factors[#factors][2] = { reverse_list(factors[#factors][2]), mode = A.mode }
+          table.insert(factors, {{ mode = A.mode }, { mode = A.mode}})
+        end
         i, k = i-1, k-1
       end
     end
   end
+  factors = reverse_list(factors)
+  factors[1][1] = { reverse_list(factors[1][1]), mode = A.mode }
+  factors[1][2] = { reverse_list(factors[1][2]), mode = A.mode }
   return {
     {
       solution = {
@@ -1105,6 +1139,8 @@ function appa.solve_tab_approx(A, B, C, deviation_max)
   end
   return i_exact, i_approx
 end
+
+-- appa.solve_tab = function (A, B, C) appa.solve_tab_approx(A, B, C) end
 
 
 function appa.solve_tree(x, y, z)
