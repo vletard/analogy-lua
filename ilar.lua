@@ -295,7 +295,8 @@ for request_txt in io.stdin:lines() do
           table.insert(index_results.cubes, #list)
           print(string.format("latency_solution %2.3f", r.latency / time_unit))
           print(string.format("result cube_dev  %6d -> %s", #list, r.final))
-          print(string.format("detail deviation %d", s.deviation))
+          print(string.format("detail deviation search %d", s.deviation_search))
+          print(string.format("detail deviation solve %d", s.deviation_solve))
           print(string.format("detail triple O  %s\t%s\t%s", r.x, r.y, r.z))
         end
 
