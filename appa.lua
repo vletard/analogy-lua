@@ -643,22 +643,41 @@ end
 
 function appa.solve_tab_approx(A, B, C, deviation_max)
   deviation_max = deviation_max or 0
-  local mode = A.mode
+  local mode
+  if A.mode == B.mode then
+    mode = C.mode
+  elseif A.mode == C.mode then
+    mode = B.mode
+  else
+    error(string.format("Incompatible segmentations %s, %s and %s.", A.mode, B.mode, C.mode))
+  end
 
-  -- TODO solve in character mode then check for the presence of all segments of the word segmented sequences
-  -- and delegate this code to segmentation.lua (or segmentation.c)
-  if A.mode == "words" or B.mode == "words" or C.mode == "words" then
-    mode = "words"
-    if A.mode ~= "words" then
-      A = segmentation.chunk("words", segmentation.concat(A))
-    elseif B.mode ~= "words" then
-      B = segmentation.chunk("words", segmentation.concat(B))
-    elseif C.mode ~= "words" then
-      C = segmentation.chunk("words", segmentation.concat(C))
+--  -- TODO solve in character mode then check for the presence of all segments of the word segmented sequences
+--  -- and delegate this code to segmentation.lua (or segmentation.c)
+--  if A.mode == "words" or B.mode == "words" or C.mode == "words" then
+--    mode = "words"
+--    if A.mode ~= "words" then
+--      A = segmentation.chunk("words", segmentation.concat(A))
+--    elseif B.mode ~= "words" then
+--      B = segmentation.chunk("words", segmentation.concat(B))
+--    elseif C.mode ~= "words" then
+--      C = segmentation.chunk("words", segmentation.concat(C))
+--    end
+--  end
+  
+  if A.mode == "characters" or B.mode == "characters" or C.mode == "characters" then
+    if A.mode ~= "characters" then
+      A = segmentation.chunk("characters", segmentation.concat(A, " "))
+    end
+    if B.mode ~= "characters" then
+      B = segmentation.chunk("characters", segmentation.concat(B, " "))
+    end
+    if C.mode ~= "characters" then
+      C = segmentation.chunk("characters", segmentation.concat(C, " "))
     end
   end
 
-  assert(A.mode == B.mode and A.mode == C.mode)
+--  assert(A.mode == B.mode and A.mode == C.mode)
 
   -- Si A == C alors B == D
   if utils.deepcompare(A, C) then

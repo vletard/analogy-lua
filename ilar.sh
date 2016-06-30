@@ -43,7 +43,7 @@ OPTIONS
 example_base_source=
 example_base_target=
 source_segmentation=words
-target_segmentation=characters
+target_segmentation=words
 
 analogical_mode=both
 deviation_search=0

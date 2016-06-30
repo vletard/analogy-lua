@@ -4,10 +4,10 @@ local _segmentation = {
 local  input_mode = "words"
 local output_mode = "words"
 local modes = {
-  ["words"]              = { dynamic = false, pattern = "%S+"    },
-  ["pounds"]             = { dynamic = false, pattern = "[^£]+"  },
-  ["words+spaces"]       = { dynamic = false, pattern = "%S+%s*" },
-  ["characters"]         = { dynamic = false, pattern = "."      },
+  ["words"]              = { dynamic = false, sep = " ", pattern = "%S+"    },
+  ["bars"]               = { dynamic = false, sep = " ", pattern = "[^|]+"  },
+  ["words+spaces"]       = { dynamic = false, sep = "",  pattern = "%S+%s*" },
+  ["characters"]         = { dynamic = false, sep = "",  pattern = "."      },
   ["words_dynamic"]      = { dynamic =  true, pattern = "%S+"    },
   ["characters_dynamic"] = { dynamic =  true, pattern = "."      },
   ["symbols_dynamic"]    = { dynamic =  true }
@@ -18,7 +18,7 @@ _segmentation.dynamic = false
 local function check_mode(new_mode)
   if not modes[new_mode] then
     local mode_str = ""
-    for m, _ in pairs(legal_modes) do
+    for m, _ in pairs(modes) do
       if mode_str ~= "" then
         mode_str = mode_str..", "
       end
@@ -53,7 +53,7 @@ end
 -- Segmenting the given character strings and returns a table of the results.
 -- If only one string is passed, directly returns the sequence of symbols (rather than the list of sequences)
 function _segmentation.chunk(mode, ...)
-  assert(modes[mode])
+  check_mode(mode)
   local segmented = {}
   for _, item in ipairs(table.pack(...)) do
     assert(type(item) == "string" or mode == "symbols_dynamic")
@@ -61,7 +61,7 @@ function _segmentation.chunk(mode, ...)
     if mode == "symbols_dynamic" then
       item_segmented[1] = utils.table.deep_copy(item)
     else
-      for s in item:gmatch(modes[mode].pattern) do
+      for s in item:gmatch(modes[mode].pattern, "%1") do
         table.insert(item_segmented[1], s)
       end
     end
@@ -107,9 +107,13 @@ function _segmentation.concat(chunked, sep)
   assert(sep == nil or type(sep) == "string")
   assert(#chunked > 0)
   local mode = chunked.mode
-  assert(modes[mode])
+  check_mode(mode)
   local str = ""
-  local space = sep or ((modes[mode].pattern == "%S+") and " " or "")
+  local space = sep or modes[mode].sep or ""
+  if not space:match("^%s*$") then
+    space = space:gsub("^%s*(%S.*)", "%1"):gsub("(.*%S)%s*$", "%1")
+    space = " "..space.." "
+  end
   assert(type(chunked[1]) == "table")
   for i, item in ipairs(chunked[1]) do
     assert(type(item) == "string")
