@@ -27,7 +27,11 @@ for input in io.stdin:lines() do
   local results = appa.solve_tab(triple[1], triple[2], triple[3])
   if #results > 0 then
     local selected = results[#results]
-    print(string.format("%03d", selected.factors).."\t"..segmentation.concat(selected.solution.t))
+    local factor_str = ""
+    for _, f in ipairs(selected.factors) do
+      factor_str = factor_str.."\t"..segmentation.concat(f[1]).."\t"..segmentation.concat(f[2])
+    end
+    print(string.format("%03d", #selected.factors).."\t"..segmentation.concat(selected.solution.t)..factor_str)
 --    info(segmentation.concat(results[#results].solution.t).."\t: "..txt_triple[3].." :: "..txt_triple[2].." : "..txt_triple[1])
   end
 end
