@@ -209,5 +209,5 @@ for line in io.stdin:lines() do
     end
   end
   print(string.format("detail totaltime %.3f", (utils.time() - time) / time_unit))
-  print("final "..segmentation.concat(final))
+  print("final "..segmentation.concat(final).."\n")
 end
