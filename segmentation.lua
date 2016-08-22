@@ -93,6 +93,99 @@ function _segmentation.chunk(mode, ...)
   end
 end
 
+-- Segmenting the given splitted str and returns a table of the results.
+-- The parameter chunks is a list of pairs of indices for the non splittable chunks.
+function _segmentation.constrained_chunk(mode, split_str, chunks)
+  chunks = chunks or {}
+  assert(type(mode) == "string")
+  assert(type(split_str) == "table")
+  local segmented = { [1] = {}, mode = mode }
+  if mode == "characters" then
+    local c_i = 1
+    local buffer = ""
+    for i, c in ipairs(split_str) do
+      if chunks[c_i] and i >= chunks[c_i][1] then
+        assert(i <= chunks[c_i][2])
+        buffer = buffer..c
+        if i == chunks[c_i][2] then
+          if #buffer > 0 then
+            table.insert(segmented[1], buffer)
+            buffer = ""
+          end
+          c_i = c_i + 1
+        end
+      else
+        table.insert(segmented[1], c)
+      end
+    end
+  elseif mode == "words" then
+
+    utils.write(chunks)
+    -- Reducing the spans of the non splittable chunks
+    -- Left to right
+    for _, nsc in ipairs(chunks) do
+      while not (nsc[1] == 1 or split_str[nsc[1]-1]:sub(-1):match("%s")) do
+        nsc[1] = nsc[1] + 1
+        if nsc[1] >= nsc[2] then
+          break
+        end
+      end
+    end
+
+    -- and right to left
+    for _, nsc in ipairs(chunks) do
+      while not (nsc[2] == #split_str or split_str[nsc[2]+1]:sub(1, 1):match("%s")) do
+        nsc[2] = nsc[2] - 1
+        if nsc[1] >= nsc[2] then
+          break
+        end
+      end
+    end
+
+    utils.write(chunks)
+    -- Removing empty non splittable chunks
+    do
+      local chunks_ = chunks
+      chunks = {}
+      for _, nsc in ipairs(chunks_) do
+        if nsc[1] < nsc[2] then
+          table.insert(chunks, nsc)
+        end
+      end
+    end
+    utils.write(chunks)
+
+    local buffer = ""
+    local c_i = 1
+    for i, c in ipairs(split_str) do
+      if chunks[c_i] and i >= chunks[c_i][1] then
+        assert(i <= chunks[c_i][2])
+        buffer = buffer..c
+        if i == chunks[c_i][2] then
+          if #buffer > 0 then
+            table.insert(segmented[1], buffer)
+            buffer = ""
+          end
+          c_i = c_i + 1
+        end
+      elseif c:match("%s") then
+        if #buffer > 0 then
+          table.insert(segmented[1], buffer)
+          buffer = ""
+        end
+      else
+        buffer = buffer..c
+      end
+    end
+    if #buffer > 0 then
+      table.insert(segmented[1], buffer)
+    end
+  else
+    error("constrained_chunk does not work with mode '"..mode.."'")
+  end
+  return segmented
+end
+
 function _segmentation.chunk_input(...)
   return _segmentation.chunk(input_mode, ...)
 end
