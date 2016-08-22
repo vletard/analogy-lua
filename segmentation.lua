@@ -16,6 +16,7 @@ local modes = {
 _segmentation.dynamic = false
 
 local function check_mode(new_mode)
+  assert(type(new_mode) == "string")
   if not modes[new_mode] then
     local mode_str = ""
     for m, _ in pairs(modes) do

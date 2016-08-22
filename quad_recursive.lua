@@ -106,8 +106,15 @@ local function recursive_translation(input, limit, exhaustive, history, depth)
                           t.solution.t.type = "indirect"
                           memoization[str] = memoization[str] or default_table()
                           table.insert(memoization[str], t.solution.t)
---                           io.stderr:write(string.format("%-60s : %-60s\n%-60s ::\n%-60s : %-60s\n", segmentation.concat(example1.first), segmentation.concat(example2.first), "", segmentation.concat(r.solution.t), segmentation.concat(input)))
---                           io.stderr:write(string.format("%-60s : %-60s\n%-60s ::\n%-60s : %-60s\n\n", segmentation.concat(target1), segmentation.concat(target2), "", segmentation.concat(m), segmentation.concat(t.solution.t)))
+                           io.stderr:write(string.format("indirect:\n%80s  %s\n%80s  %s\n%80s  %s\n%80s  %s\n",
+                             segmentation.concat(example1.first),
+                             segmentation.concat(target1),
+                             segmentation.concat(example2.first),
+                             segmentation.concat(target2),
+                             segmentation.concat(r.solution.t),
+                             segmentation.concat(m),
+                             segmentation.concat(input),
+                             segmentation.concat(t.solution.t)))
                           if not exhaustive then
                             return memoization[str]
                           end
@@ -127,7 +134,7 @@ local function recursive_translation(input, limit, exhaustive, history, depth)
          for _, t in ipairs(direct_results) do
            t.solution.t.type = "direct"
            table.insert(results_direct, t.solution.t)
-           io.stderr:write(string.format("%-60s : %-60s\n%-60s ::\n%-60s : %-60s\n\n", segmentation.concat(example1.first), segmentation.concat(target1), "", segmentation.concat(input), segmentation.concat(t.solution.t)))
+           io.stderr:write(string.format("direct:\n%s\n%s\n%s\n%s\n\n", segmentation.concat(example1.first), segmentation.concat(target1), segmentation.concat(input), segmentation.concat(t.solution.t)))
          end
        end
      end
@@ -204,10 +211,9 @@ for line in io.stdin:lines() do
       print(string.format("result cube      %6d -> %s", nb_cube,   segmentation.concat(t)))
     else
       nb_single = nb_single + 1
-      io.stderr:write(utils.tostring(t))
       print(string.format("result single    %6d -> %s", nb_single, segmentation.concat(t)))
     end
   end
   print(string.format("detail totaltime %.3f", (utils.time() - time) / time_unit))
-  print("final "..segmentation.concat(final).."\n")
+  print("final "..segmentation.concat(final or segmentation.chunk(chunk_mode, "")).."\n")
 end
