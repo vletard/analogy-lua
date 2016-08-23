@@ -7,7 +7,7 @@ local modes = {
   ["words"]              = { dynamic = false, sep = " ", pattern = "%S+"    },
   ["bars"]               = { dynamic = false, sep = " ", pattern = "[^|]+"  },
   ["words+spaces"]       = { dynamic = false, sep = "",  pattern = "%S+%s*" },
-  ["characters"]         = { dynamic = false, sep = "",  pattern = "."      },
+  ["characters"]         = { dynamic = false, sep = "",  pattern = "[%z\1-\127\194-\244][\128-\191]*"      },
   ["words_dynamic"]      = { dynamic =  true, pattern = "%S+"    },
   ["characters_dynamic"] = { dynamic =  true, pattern = "."      },
   ["symbols_dynamic"]    = { dynamic =  true }
@@ -120,7 +120,6 @@ function _segmentation.constrained_chunk(mode, split_str, chunks)
     end
   elseif mode == "words" then
 
-    utils.write(chunks)
     -- Reducing the spans of the non splittable chunks
     -- Left to right
     for _, nsc in ipairs(chunks) do
@@ -142,7 +141,6 @@ function _segmentation.constrained_chunk(mode, split_str, chunks)
       end
     end
 
-    utils.write(chunks)
     -- Removing empty non splittable chunks
     do
       local chunks_ = chunks
@@ -153,7 +151,6 @@ function _segmentation.constrained_chunk(mode, split_str, chunks)
         end
       end
     end
-    utils.write(chunks)
 
     local buffer = ""
     local c_i = 1
@@ -183,7 +180,34 @@ function _segmentation.constrained_chunk(mode, split_str, chunks)
   else
     error("constrained_chunk does not work with mode '"..mode.."'")
   end
+--  utils.write({ mode = mode, spli_str = split_str, chunks = chunks, result = segmented})
   return segmented
+end
+
+-- Transforms the character chunked input into a word chunked output
+-- Useful when the input segments do not necessarily have the same length
+-- The boolean character_styled can be set to true for character style word segmentation
+function _segmentation.group_words(chunked, character_styled)
+  assert(type(chunked) == "table")
+  assert(type(chunked[1]) == "table")
+  assert(chunked.mode == "characters")
+  character_styled = character_styled or false
+  if character_styled then
+    error("character_styled parameter is not considered yet")
+  end
+  local new_chunked = { [1] = {}, mode = "words"}
+  local buffer = ""
+  for i, c in ipairs(chunked[1]) do
+    if c:match("%s") then
+      if #buffer > 0 then
+        table.insert(new_chunked, buffer)
+        buffer = ""
+      end
+    else
+      buffer = buffer..c
+    end
+  end
+  return new_chunked
 end
 
 function _segmentation.chunk_input(...)
