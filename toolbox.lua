@@ -372,7 +372,7 @@ function toString(obj, params, ref)
                   if type(a) == "number" then
                     return a < b
                   else
-                    return tostring(a) > tostring(b)
+                    return tostring(a) < tostring(b)
                   end
                 else
                   return type(a) < type(b)

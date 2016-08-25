@@ -1,4 +1,4 @@
-#!/usr/bin/env lua
+#!/usr/bin/env idial
 
 local utils        = dofile "toolbox.lua"
 knowledge    = dofile "knowledge.lua"
@@ -19,6 +19,7 @@ local full_resolution = false  -- assign false for optimized execution
 
 local key_file, value_file
 
+local arg = comp.argv()
 
 if #arg ~= 10 then
   io.stderr:write("Usage: "..arg[0].." KEY_FILE VALUE_FILE ANALOGICAL_MODE DYNAMIC_SEG_MODE INTERACTIVE DEVIATION_SEARCH DEVIATION_SOLVE SOURCE_SEG TARGET_SEG CUBE_TIME_LIMIT")
@@ -187,7 +188,7 @@ for request_txt in io.stdin:lines() do
       loc_time = utils.time()
       global_time = loc_time
       local cubes, cubes_dev
-      cubes, cube.unknown, cubes_dev = search.build_cubes(request, request_txt)
+      cubes, cube.unknown, cubes_dev = search.build_cubes_LCS(request, request_txt)
       for _, s in ipairs(cubes) do
         table.insert(solutions, s)
         cube.nb = cube.nb + 1
@@ -246,6 +247,9 @@ for request_txt in io.stdin:lines() do
             table.insert(index_results.cubes, #list)
             print(string.format("latency_solution %2.3f", r.latency / time_unit))
             print(string.format("result cube      %6d -> %s", #list, r.final))
+            if s.LCS then
+              print(string.format("detail LCS (%3d)       %s", #s.LCS, segmentation.concat({ s.LCS, mode = "characters"})))
+            end
             print(string.format("detail triple O  %s\t%s\t%s", r.x, r.y, r.z))
           end
 
@@ -347,3 +351,5 @@ if interactive then
   io.stderr:write ""
 end
 --------------------------------------------------------------------------------
+
+comp.quit()

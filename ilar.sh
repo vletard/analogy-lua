@@ -144,4 +144,4 @@ interactive:         $interactive
 time_limit_indirect: $time_limit_indirect
 " >&2
 
-cat $input_file | ./ilar.lua "$example_base_source" "$example_base_target" "$analogical_mode" "$segmentation_mode" "$interactive" "$deviation_search" "$deviation_solve" "$source_segmentation" "$target_segmentation" "$time_limit_indirect"
+cat $input_file | ./ilar.lua -- "$example_base_source" "$example_base_target" "$analogical_mode" "$segmentation_mode" "$interactive" "$deviation_search" "$deviation_solve" "$source_segmentation" "$target_segmentation" "$time_limit_indirect"

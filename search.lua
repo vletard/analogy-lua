@@ -16,7 +16,11 @@ local params = {
   debug =  true,
   log   =  true,
 
-  segment_delimiter = nil -- " # ",
+  segment_delimiter = nil, -- " # ",
+  
+  LCS_host = "127.0.0.1",
+  LCS_port = 9999,
+  LCS_segmentation = "words"
 }
 
 -- Return false if the stop parameters have been reached, true if not
@@ -402,6 +406,124 @@ function search.build_cubes(request, request_txt)
   return solutions, unknown, solutions_dev
 end
 --------------------------------------------------------------------------------
+
+
+local function find_LCS(request)
+  local s = sock.connect_tcp(params.LCS_host, params.LCS_port)
+  if not s then
+    error("Unable to reach "..params.LCS_host..":"..params.LCS_port)
+  end
+
+  -- Always characters first then words or characters (after LCS is identified)
+  for i, c in ipairs(request[1]) do
+    if i > 1 then
+      s:str():write("\t")
+    end
+    s:str():write(c)
+  end
+  s:str():write("\n")
+  s:str():flush()
+
+  local match = {}
+  do
+    local line = s:str():read_line()
+    while line do
+      local sub_str_start, sub_str_end, matches = line:match("^(%d+) (%d+)\t(.*)$")
+      sub_str_start = tonumber(sub_str_start) + 1
+      sub_str_end   = tonumber(sub_str_end  ) + 1
+
+      for offset, id in matches:gmatch("(%d+) (%d+)") do
+        offset = offset + 1
+        id = id + 1
+        table.insert(match, {
+          from   = sub_str_start,
+          to     = sub_str_end,
+          utt_id = id,
+          offset = offset,
+          utt_w  = segmentation.constrained_chunk("words", knowledge.pairs[knowledge.ordered[id]].first[1], {{ offset, offset + sub_str_end - sub_str_start}}),
+          utt_c  = segmentation.constrained_chunk("characters", knowledge.pairs[knowledge.ordered[id]].first[1], {{ offset, offset + sub_str_end - sub_str_start}}),
+          req_w  = segmentation.constrained_chunk("words", request[1], {{ sub_str_start, sub_str_end }}),
+          req_c  = segmentation.constrained_chunk("characters", request[1], {{ sub_str_start, sub_str_end }}),
+          mapping = knowledge.pairs[knowledge.ordered[id]]
+        })
+      end
+      line = s:str():read_line()
+    end
+    s:str():close()
+  end
+  return match
+end
+
+function search.build_cubes_LCS(request, request_txt)
+  local time = utils.time()
+  local unknown   = knowledge.list_unknown(request)
+  local solutions = {}
+  
+  for _, y in pairs(knowledge.pairs) do
+    for _, z in ipairs(find_LCS(request)) do
+      local y_w = segmentation.chunk("words", segmentation.concat(y.first))
+      if appa.count(z.req_w, z.utt_w, y_w) then
+        for _, r in ipairs(appa.solve_tab_approx(z.req_w, z.utt_w, y_w)) do
+          local r_s = segmentation.chunk("characters", segmentation.concat(r))
+          local k = next(knowledge.pairs)
+          local x = knowledge.pairs[utils.tostring(r_s[1])]
+          if x then
+            local results = {}
+            for _, c_x in pairs(x.second) do
+              for _, c_y in pairs(y.second) do
+                for _, c_z in pairs(z.mapping.second) do
+                  for _, s in ipairs(appa.solve_tab_approx(c_x, c_y, c_z)) do
+                    table.insert(results, {
+                      x = segmentation.concat(c_x),
+                      y = segmentation.concat(c_y),
+                      z = segmentation.concat(c_z),
+                      t = segmentation.concat(s),
+                      final = segmentation.concat(s),
+                      latency = utils.time() - global_time
+                    })
+                  end
+                end
+              end
+            end
+
+            if #results > 0 then
+              local LCS = {}
+              for i = z.from, z.to do
+                table.insert(LCS, request[1][i])
+              end
+              table.insert(solutions, {
+                triple = {
+                  X = {
+                    request = r,
+                    commands = x.second
+                  },
+                  Y = {
+                    request = y.first,
+                    commands = y.second
+                  },
+                  Z = {
+                    request = z.mapping.first,
+                    commands = z.mapping.second
+                  },
+                  x = segmentation.concat(r),
+                  y = segmentation.concat(y.first),
+                  z = segmentation.concat(z.mapping.first),
+                  t = segmentation.concat(request),
+                },
+                results = results,
+                latency = utils.time() - global_time,
+                cube = true,
+                LCS = LCS
+              })
+            end
+          end
+        end
+      end
+    end
+  end
+
+  return solutions, unknown, {}
+end
 
 
 --------------------------------------------------------------------------------
