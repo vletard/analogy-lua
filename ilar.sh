@@ -124,8 +124,7 @@ fi
 
 if [ "$example_base_source" == "" ] || [ "$example_base_target" == "" ]
 then
-  echo "Source and target example base files must be specified." >&2
-  echo "$HELP" >&2
+  echo "Source and target example base files (or pattern) must be specified." >&2
   exit 1
 fi
 
