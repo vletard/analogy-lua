@@ -1,6 +1,6 @@
 #!/usr/bin/env lua
 
-dofile "/people/letard/local/lib/lua/toolbox.lua"
+dofile "toolbox.lua"
 appa         = dofile "appa.lua"
 segmentation = dofile "segmentation.lua"
 
